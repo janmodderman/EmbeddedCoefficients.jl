@@ -316,7 +316,7 @@ function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
     Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
     dcf = interpolate_everywhere(CellField(d,Ω),Vd)
     @show ∑(∫(∇(dcf)⊙∇(dcf))dΓ)
-    @show ∫(∇(dcf)⊙∇(dcf))dΓ
+    # @show ∫(∇(dcf)⊙∇(dcf))dΓ
     for k in Ks
         ω = √(k * g)
         a_wϕ,_,_ = weak_form(k,ω,nΓ,dΩ,dΓ,dΓf,dΓo)                          # conformal weak form (only a_wϕ)
@@ -449,8 +449,8 @@ cutgeo, cutgeo_facets = cutting_model(model,geo)
 # writevtk(Γ,"Gammasbm",cellfields=["d"=>d(pmid,R),"n"=>n(pmid)])
 
 # run case for agfem, cutfem or sbm
-# (aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
-# (aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
+(aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
+(aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
 (aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid), d(pmid,R))
 
 write_csv(aₐ,bₐ,outputdir*"agfem/cylHR0000_$order.csv";namex="A",namey="B")
