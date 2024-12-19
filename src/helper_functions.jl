@@ -177,10 +177,7 @@ function weak_form(nE,dE,γg,h,::Val{1})
 end # function
 
 # SBM weak form := conformal weak form + shifted Neumann + shifted hydrodynamic BC
-function weak_form(ω::Float64,nΓ::CellField,dΓ::Measure,n::Function,d::Function,V::FESpace,dcf1::CellField)
-    # dcf = interpolate_everywhere(d,V)
-    # dcf = CellField(d,Ω)
-    dcf = interpolate_everywhere(dcf1,V)
+function weak_form(ω::Float64,nΓ::CellField,dΓ::Measure,n::Function,d::Function,dcf::FEFunction)
     a_wϕ = (ϕ, w) -> ∫(w*(n⋅nΓ)*((∇∇(ϕ)⋅d + ∇(ϕ))⋅n) - w* ∇(ϕ)⋅nΓ)dΓ
     a_vϕ = (ϕ, v) -> ∫( (im*ω* (-1.0))*( ϕ + (∇(ϕ)⋅d)) * (v⋅n) *(nΓ⋅n) * (∇(dcf)⊙∇(dcf)))dΓ
     a_wu = (u, w) -> ∫( im*ω*w*(n⋅nΓ)*(u⋅n) )dΓ
@@ -317,12 +314,13 @@ function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
 
     # required now to obtain gradient of d, TODO: find more better and elegant solution
     Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
-    dcf = CellField(d,Ω)
-
+    dcf = interpolate_everywhere(CellField(d,Ω),Vd)
+    @show ∑(∫(∇(dcf)⊙∇(dcf))dΓ)
+    @show ∫(∇(dcf)⊙∇(dcf))dΓ
     for k in Ks
         ω = √(k * g)
         a_wϕ,_,_ = weak_form(k,ω,nΓ,dΩ,dΓ,dΓf,dΓo)                          # conformal weak form (only a_wϕ)
-        a_wϕₛ,a_vϕ,a_wu = weak_form(ω,nΓ,dΓ,n,d,Vd,dcf)                            # shifted contributions (on a_wϕ, a_vϕ and a_uw)
+        a_wϕₛ,a_vϕ,a_wu = weak_form(ω,nΓ,dΓ,n,d,dcf)                            # shifted contributions (on a_wϕ, a_vϕ and a_uw)
         A_wϕ = assemble_matrix(a_wϕ, Φ, W)                                  # assemble conformal matrix contributions
         # A_wϕₛ,A_wu,A_vϕ = assemble_matrices(a_wϕₛ,a_wu,a_vϕ,W,V,Φ,U)        # assemble shifted matrix contributions
         A_wϕₛ = assemble_matrix(a_wϕₛ, Φ, W) 
@@ -437,7 +435,6 @@ outputdir = "data/sims/"   # output directory
 # case specific variables
 R = 0.1                         # [m]: radius
 pmid = VectorValue(0.0,0.0)     # [m]: center point of radius
-pmid2 = x->pmid
 ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
 Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 
@@ -454,7 +451,7 @@ cutgeo, cutgeo_facets = cutting_model(model,geo)
 # run case for agfem, cutfem or sbm
 # (aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
 # (aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
-(aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid2), d(pmid2,R))
+(aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid), d(pmid,R))
 
 write_csv(aₐ,bₐ,outputdir*"agfem/cylHR0000_$order.csv";namex="A",namey="B")
 write_csv(aₑ,bₑ,outputdir*"cutfem/cylHR0000_$order.csv";namex="A",namey="B")
