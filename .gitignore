@@ -1,3 +1,8 @@
+# ignore ALL files in ANY directory named temp
+data/sims/
+data/exp_raw/
+data/exp_pro/
+
 /A_cyl0000.png
 /A_cyl0342.png
 /A_cyl0643.png
