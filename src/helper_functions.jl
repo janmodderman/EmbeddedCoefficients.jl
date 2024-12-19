@@ -179,16 +179,17 @@ end # function
 # SBM weak form := conformal weak form + shifted Neumann + shifted hydrodynamic BC
 function weak_form(ω::Float64,nΓ::CellField,dΓ::Measure,n::Function,d::Function,dcf::FEFunction)
     a_wϕ = (ϕ, w) -> ∫(w*(n⋅nΓ)*((∇∇(ϕ)⋅d + ∇(ϕ))⋅n) - w* ∇(ϕ)⋅nΓ)dΓ
-    a_vϕ = (ϕ, v) -> ∫( (im*ω* (-1.0))*( ϕ + (∇(ϕ)⋅d)) * (v⋅n) *(nΓ⋅n) * (∇(dcf)⊙∇(dcf)))dΓ
+    a_vϕ = (ϕ, v) -> ∫( (im*ω* (-1.0))*( ϕ + (∇(ϕ)⋅d)) * (v⋅n) *(nΓ⋅n) * J(dcf))dΓ
     a_wu = (u, w) -> ∫( im*ω*w*(n⋅nΓ)*(u⋅n) )dΓ
     a_wϕ,a_vϕ,a_wu
 end # function
 
 #==============================================================================================================================#
-# id(x) = TensorValue(1.0,0.0,0.0,1.0)
 
-# Ft(∇u) = x -> id(x) + ∇u(x)
-# J(u) = (Ft∘(∇(u)))⊙(Ft∘(∇(u)))
+# Jacobian J(u) for the distance function d for SBM
+Ft(∇u) = TensorValue(1.0,0.0,0.0,1.0) + ∇u
+J(u) = meas∘(Ft(∇(u)))
+# J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 
 # pmid1(pmid,x) = pmid - x
 # pmid1(pmid) = x -> pmid1(pmid,x)
@@ -313,9 +314,9 @@ function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
     W,Φ,V,U = setup_spaces(order, model, Ω, num_dims(model))
 
     # required now to obtain gradient of d, TODO: find more better and elegant solution
-    Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
+    Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},order)) # current implementation requires higher order to correctly get the gradient of the distance function
     dcf = interpolate_everywhere(CellField(d,Ω),Vd)
-    @show ∑(∫(∇(dcf)⊙∇(dcf))dΓ)
+    # @show ∑(∫(∇(dcf)⊙∇(dcf))dΓ)
     # @show ∫(∇(dcf)⊙∇(dcf))dΓ
     for k in Ks
         ω = √(k * g)
@@ -449,15 +450,15 @@ cutgeo, cutgeo_facets = cutting_model(model,geo)
 # writevtk(Γ,"Gammasbm",cellfields=["d"=>d(pmid,R),"n"=>n(pmid)])
 
 # run case for agfem, cutfem or sbm
-(aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
-(aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
+# (aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
+# (aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
 (aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid), d(pmid,R))
 
-write_csv(aₐ,bₐ,outputdir*"agfem/cylHR0000_$order.csv";namex="A",namey="B")
-write_csv(aₑ,bₑ,outputdir*"cutfem/cylHR0000_$order.csv";namex="A",namey="B")
+# write_csv(aₐ,bₐ,outputdir*"agfem/cylHR0000_$order.csv";namex="A",namey="B")
+# write_csv(aₑ,bₑ,outputdir*"cutfem/cylHR0000_$order.csv";namex="A",namey="B")
 write_csv(aₛ,bₛ,outputdir*"sbm/cylHR0000_$order.csv";namex="A",namey="B")
 
-# plotter0000()
+plotter0000()
 # show(to)
 
 
