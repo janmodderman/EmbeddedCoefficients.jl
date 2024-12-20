@@ -2,6 +2,8 @@
 data/sims/
 data/exp_raw/
 data/exp_pro/
+src/time_domain/
+plots/
 
 /A_cyl0000.png
 /A_cyl0342.png

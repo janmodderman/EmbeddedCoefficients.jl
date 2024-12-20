@@ -35,7 +35,7 @@ end # function
 # rectangle (2D)
 function setup_domain(B::Float64,D::Float64,pmin::VectorValue,mesh::String,::Val{2},::Val{:rectangle})
     model = GmshDiscreteModel(mesh)
-    geo = quadrilateral(;x0=pmin,d1=VectorValue(B/2,0.0),d2=VectorValue(0.0,D))
+    geo = quadrilateral(;x0=pmin-VectorValue(B/2,D),d1=VectorValue(B,0.0),d2=VectorValue(0.0,2*D))
     model,geo
 end # function
 
@@ -43,7 +43,7 @@ function setup_domain(B::Float64,D::Float64,pmid::VectorValue,L₁::Float64,d::F
     pmin = Point(0.0, -d)
     pmax = Point(L₁, 0.0)
     model = CartesianDiscreteModel(pmin, pmax, partition)
-    geo = quadrilateral(;x0=pmid-VectorValue(B/2,D),d1=VectorValue(B,0.0),d2=VectorValue(0.0,D))
+    geo = quadrilateral(;x0=pmid-VectorValue(B/2,D),d1=VectorValue(B,0.0),d2=VectorValue(0.0,2*D))
     labels_Γ = get_face_labeling(model)  # get the face labeling of model_Γ 
     add_tag_from_tags!(labels_Γ, "seabed", [1,2,5])  
     add_tag_from_tags!(labels_Γ, "inlet", [3, 7])
@@ -224,13 +224,30 @@ end # function
 
 # fast
 function Ay(A_wϕ,A_wu,A_vϕ)
-    y = zeros(ComplexF64,2,2)
-    for i in 1:size(A_wu)[2]
-        u = Gridap.solve(LUSolver(),A_wϕ,Vector(A_wu[:,i]))
+    sz  = size(A_wu)
+    y = zeros(ComplexF64,sz[2],sz[2])
+    ss = symbolic_setup(LUSolver(),A_wϕ)
+    ns = numerical_setup(ss,A_wϕ)
+    u = similar(Vector{ComplexF64}(A_wu[:,1]))
+    for i in 1:sz[2]
+        u = Gridap.Algebra.solve!(u,ns,Vector{ComplexF64}(A_wu[:,i]))
         y[i,:] = A_vϕ*u 
-    end # for
+    end
     y
 end # function
+
+# function Ay(A_wϕ,A_wu,A_vϕ)
+#     sz  = size(A_wu)
+#     y = zeros(ComplexF64,sz[2],sz[2])
+#     # ss = symbolic_setup(LUSolver(),A_wϕ)
+#     # ns = numerical_setup(ss,A_wϕ)
+#     u = similar(Vector{ComplexF64}(A_wu[:,1]))
+#     for i in 1:sz[2]
+#         u = Gridap.Algebra.solve!(LUSolver(),A_wϕ,Vector{ComplexF64}(A_wu[:,i]))
+#         y[i,:] = A_vϕ*u 
+#     end
+#     y
+# end # function
 
 #==============================================================================================================================#
 
@@ -245,7 +262,7 @@ end # function
 #==============================================================================================================================#
 
 # RUN CASES
-function run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
+function run_agfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets,to)
     added_mass = []
     added_damping = []
     degree = 2*order
@@ -267,7 +284,7 @@ function run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
     (added_mass,added_damping)
 end # function
 
-function run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h;GPflag=true)
+function run_cutfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets, γg, h,to;GPflag=true)
     added_mass = []
     added_damping = []
     degree = 2*order
@@ -294,7 +311,7 @@ function run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h;GPflag=
     (added_mass,added_damping)
 end # function
 
-function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
+function run_sbm(Ks, ρV,g, order, model, cutgeo, n, d, to)
     added_mass = []
     added_damping = []
     degree = 2*order
@@ -374,63 +391,54 @@ function write_csv(x,y,dirname;namex="x",namey="y")
     CSV.write(dirname,(DataFrame(flattened)))
 end # function
 
-
-# y1 = Any[0.7185196587636757, 0.637885783829143, 0.5782845238528137, 0.5321282920210016, 0.4953140561041668, 0.46520883841893373, 0.4403467295260227, 0.41852520218703143, 0.39942378295282177, 0.385236168260485, 0.3727114543606869, 0.3588885419250259, 0.3498156540606156, 0.34274609545264795, 0.3349563100718828, 0.323928085443556, 0.3172377054643731, 0.3176846147773164, 0.3174754047370269, 0.3090674990860375, 0.30825406843078573, 0.3106380147651668, 0.30031216904500363, 0.30178451920041666, 0.2995910335629596, 0.30239694485110036, 0.29415860427140017, 0.2977771660024027, 0.30063556559227045, 0.29322934392486977, 0.29723969507722137, 0.29259773813367335, 0.30473745767585464, 0.30182437694209424, 0.3056905653110921, 0.3073123567567107, 0.29917528718050246, 0.28599360154185405, 0.3049216287102037, 0.3136525865277211, 0.3141884024998921, 0.31060642837562286, 0.31052052221371806, 0.3023322430439674, 0.3093107838247952, 0.3172835351747758, 0.3204271141613397, 0.3252692443402839, 0.31880333938428623, 0.30372109820154564, 0.3270818556626764, 0.33496043652585483, 0.3170704885415966, 0.33823673749981753, 0.32164216374134647, 0.3234400248574641, 0.33756613740467617, 0.3433402920936833, 0.33254072611903696, 0.3303335774855977, 0.3332229725406265, 0.35457922582617457, 0.33967242894886, 0.34275909735307936, 0.32908888447649914, 0.365383884356667, 0.3562199762683824, 0.3302835407394619, 0.3523576209605079, 0.3715440755695462, 0.34636279154917865, 0.35175769637181326, 0.3515554109444105, 0.3763505304602129, 0.3500799935075541, 0.3546296148364313, 0.3708721220723904]
-# y2 = Any[0.8591286608534882, 0.8100375816149905, 0.7646730887642254, 0.7236837379279506, 0.6868019313753245, 0.6528136807890572, 0.6216243444548182, 0.5921228046562694, 0.5663605594843102, 0.5428865916721924, 0.5173097207858156, 0.49630679855468474, 0.4772868741564141, 0.45712300123813915, 0.4366214859497943, 0.4189085351925913, 0.4092200375884153, 0.3949941067253721, 0.3765949350434006, 0.3607037976484927, 0.3515337670084326, 0.33449015952559535, 0.31823944891342715, 0.31367866579639153, 0.30012704569520515, 0.2875185064198466, 0.2774130896211255, 0.27128631343643156, 0.2607014266435948, 0.24693453124022188, 0.24512019958876555, 0.23838240180696427, 0.23130423426577704, 0.22031087294535545, 0.2123778812137151, 0.19823762768580638, 0.1872619613275965, 0.19109789764909385, 0.20182703180984046, 0.18182927550398517, 0.17382133173132125, 0.16148280420681074, 0.15998619203483633, 0.1517657133386099, 0.15776804676516304, 0.15850675901159111, 0.1444679881853747, 0.13391343287332114, 0.1241933694609342, 0.13287118454133787, 0.1398664328239154, 0.11651487706845237, 0.12039288234199447, 0.11444310724427467, 0.10171379097088533, 0.12061653314492866, 0.10946349289550752, 0.10134708618942319, 0.08988294265019924, 0.09632267646721837, 0.10902602481342509, 0.08502584815464123, 0.08685486112569402, 0.07850670485580602, 0.09036676159042172, 0.09531550091825175, 0.0616363704816172, 0.06954404108220237, 0.09701476454897143, 0.06854937498351144, 0.05832509916009539, 0.0698808469380804, 0.08553909942500625, 0.05630157320847624, 0.04922834201341768, 0.07925727793164851, 0.06590800274309089]
-
-# y1 = Any[0.7182944737823116, 0.6373841879157774, 0.5778316434856834, 0.5316972682296798, 0.4947173272349353, 0.4644352226143809, 0.43913650828825596, 0.4178973078233463, 0.39985213185589175, 0.38447415303437216, 0.37115840047690357, 0.35967309659053026, 0.3495140493779759, 0.3409093561047104, 0.3337513666616771, 0.32724222337928327, 0.32204537742556855, 0.31697190823720856, 0.31233095544183204, 0.30917680265277403, 0.3067933825801121, 0.30439793268234266, 0.3021376919748066, 0.3006578737050532, 0.2987016973330239, 0.2976269498867228, 0.29729214610217847, 0.29639068647548683, 0.29804229723854453, 0.29947470525807046, 0.29830252349490227, 0.29669975870707227, 0.2967536285330529, 0.29909227656687576, 0.2984836330125522, 0.2998086343983736, 0.30017976892997567, 0.3044838104773701, 0.3062518517537721, 0.3052825857144318, 0.3063641801521448, 0.3085740373415959, 0.3090744896868355, 0.30723750779130066, 0.31013116250258504, 0.3146376260068354, 0.3179348678792444, 0.31792985431858806, 0.3168786429073354, 0.3203662303433941, 0.3227540967950564, 0.3216129551772921, 0.32399439053090456, 0.32418401941837194, 0.3288846125358081, 0.33470567146298885, 0.3295477292395301, 0.33121285148370494, 0.33771679312115016, 0.33398016818501935, 0.3337449709745275, 0.3435698505620953, 0.3397101399133165, 0.34638963475752976, 0.3437902059645227, 0.34390154898689346, 0.3468015493285692, 0.3447848888471356, 0.35697943418012, 0.35107597830502735, 0.35366846452441797, 0.35543148086289367, 0.3509938770732782, 0.3614196542878078, 0.35811704746833456, 0.36605013476629294, 0.3578027460532878]
-# y2 = Any[0.8586628026265243, 0.8100351788804363, 0.7647385907826654, 0.723771283286817, 0.6867183558593003, 0.652910995703574, 0.621980728986709, 0.5934298573736749, 0.566928069721861, 0.5421965000506397, 0.5190143676043351, 0.49723372735178417, 0.47685374825698906, 0.4579419524244054, 0.43970402539882764, 0.4225362578123775, 0.40609090672617376, 0.3901151926530417, 0.37577862357560576, 0.36244303769763614, 0.34883057648663807, 0.33567216477263984, 0.32356949727210055, 0.31183581582747993, 0.30024726349083236, 0.29066288118408906, 0.28047175318657686, 0.2712265059093779, 0.26317727170539507, 0.25200168584581334, 0.24175989731697992, 0.2330100099516471, 0.228267565112033, 0.21951067113604683, 0.2120025830133877, 0.20669589961018162, 0.1999986297035394, 0.19536704834844118, 0.185306506020133, 0.17892314086729874, 0.17416516867446855, 0.16848421605065322, 0.16108262140297097, 0.1578260446310207, 0.15643452718352227, 0.1511704755008185, 0.14540591487751348, 0.1378587849826561, 0.13415914416710287, 0.13267836954831158, 0.12626151512083983, 0.12234727646072033, 0.11998653187322103, 0.118487721702337, 0.11625244603550335, 0.10892587260321825, 0.1023322367571235, 0.1067914968128559, 0.09904993414682163, 0.0947798524854675, 0.09787233702711859, 0.09375017686571116, 0.0898117311689404, 0.08693959818822779, 0.08124394290390233, 0.08336026237970534, 0.07779790062310567, 0.08264839245607365, 0.0772692772306618, 0.07036884672456134, 0.07236229592344588, 0.06585534662722622, 0.07041488173764704, 0.0684877607939143, 0.06582843955808401, 0.06107930176961239, 0.05633169978122957]
-
-# 
-
 # TESTING
-function plotter0000()
+function plotter_case42(name::String,val::Float64,order::Int64)
 KRs = [0.1:0.025:2.0;]      # range of non-dimensional wave numbers
 
-mass_plots = plot(title="Added Mass vs KR", xlabel="KR [-]", ylabel="Added Mass Mₐ [-]")
-damping_plots = plot(title="Added Damping vs KR", xlabel="KR [-]", ylabel="Added Damping Cₐ [-]")
-data1 = CSV.read("data/sims/cutfem/cylHR0000_1.csv",DataFrame)
-data2 = CSV.read("data/sims/agfem/cylHR0000_1.csv",DataFrame)
-data3 = CSV.read("data/sims/sbm/cylHR0000_1.csv",DataFrame)
+mass_plots = plot(xlabel="k̄ [-]", ylabel="Ā₃₃ [-]")
+damping_plots = plot(xlabel="k̄ [-]", ylabel="B̄₃₃ [-]")
+data1 = CSV.read("data/sims/cutfem/cylHR$(name)_$order.csv",DataFrame)
+data2 = CSV.read("data/sims/agfem/cylHR$(name)_$order.csv",DataFrame)
+data3 = CSV.read("data/sims/sbm/cylHR$(name)_$order.csv",DataFrame)
 # 
 iA = 4
 iB = 8
 msize = 4
-plot!(mass_plots, KRs, data1[!,iA], label="CutFEM",linecolor="#332288")#,markershape=:circle)
-plot!(mass_plots, KRs, data2[!,iA], label="AgFEM",linecolor="#CC6677")#,markershape=:cross)
-plot!(mass_plots, KRs, data3[!,iA], label="SBM",linecolor="#117733")#,markershape=:diamond)
-refdatam = CSV.read("data/exp_pro/ref_cyl_me_HR0000.csv",DataFrame)
-refdatad = CSV.read("data/exp_pro/ref_cyl_de_HR0000.csv",DataFrame)
+plot!(mass_plots, KRs, data1[!,iA], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
+plot!(mass_plots, KRs, data2[!,iA], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
+plot!(mass_plots, KRs, data3[!,iA], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
+refdatam = CSV.read("data/exp_pro/ref_cyl_me_HR$name.csv",DataFrame)
+refdatad = CSV.read("data/exp_pro/ref_cyl_de_HR$name.csv",DataFrame)
 
-plot!(mass_plots,refdatam[!,1],refdatam[!,2],label="h/R=0.000",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+plot!(mass_plots,refdatam[!,1],refdatam[!,2],label="h/R=$val",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
 
-plot!(damping_plots, KRs, data1[!,iB], label="CutFEM",linecolor="#332288")#,markershape=:circle)
-plot!(damping_plots, KRs, data2[!,iB], label="AgFEM",linecolor="#CC6677")#,markershape=:cross)
-plot!(damping_plots, KRs, data3[!,iB], label="SBM",linecolor="#117733")#,markershape=:diamond)
-plot!(damping_plots,refdatad[!,1],refdatad[!,2],label="h/R=0.000",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+plot!(damping_plots, KRs, data1[!,iB], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
+plot!(damping_plots, KRs, data2[!,iB], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
+plot!(damping_plots, KRs, data3[!,iB], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
+plot!(damping_plots,refdatad[!,1],refdatad[!,2],label="h/R=$val",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
 display(mass_plots)
 display(damping_plots)
 end # function
 
-to = TimerOutput()
-# global variables      
-g = 9.81                    # [kg m/s²]: gravitational constant
-KRs = [0.1:0.025:2.0;]      # range of non-dimensional wave numbers
-order = 1                   # order of elements, either 1 or 2
-γg = 0.1                    # GP stabilization parameter 
-h = 0.0035                  # smallest element size in background mesh
-outputdir = "data/sims/"   # output directory
+# to = TimerOutput()
+# # global variables      
+# g = 9.81                    # [kg m/s²]: gravitational constant
+# KRs = [0.1:0.025:2.0;]      # range of non-dimensional wave numbers
+# order = 1                   # order of elements, either 1 or 2
+# γg = 0.1                    # GP stabilization parameter 
+# h = 0.0035                  # smallest element size in background mesh
+# outputdir = "data/sims/"   # output directory
 
-# case specific variables
-R = 0.1                         # [m]: radius
-pmid = VectorValue(0.0,0.0)     # [m]: center point of radius
-ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
-Ks = KRs./R                     # [m⁻¹]: range of wave numbers
+# # case specific variables
+# R = 0.1                         # [m]: radius
+# pmid = VectorValue(0.0,0.0)     # [m]: center point of radius
+# ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
+# Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 
 # load background model, and geometry; then cut geometry into model
-model, geo = setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
+# model, geo = setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
 # model, geo = setup_domain(R,pmid,12.0,4.0,(1500,500),Val(2),Val(:cylinder))
-cutgeo, cutgeo_facets = cutting_model(model,geo)
+# cutgeo, cutgeo_facets = cutting_model(model,geo)
 
 # check d and n analytical
 # degree = 2*order
@@ -440,13 +448,13 @@ cutgeo, cutgeo_facets = cutting_model(model,geo)
 # run case for agfem, cutfem or sbm
 # (aₐ,bₐ) = run_agfem(Ks, ρV, order, model, cutgeo, cutgeo_facets)
 # (aₑ,bₑ) = run_cutfem(Ks, ρV, order, model, cutgeo, cutgeo_facets, γg, h)
-(aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid), d(pmid,R))
+# (aₛ,bₛ) = run_sbm(Ks, ρV, order, model, cutgeo, n(pmid), d(pmid,R))
 
 # write_csv(aₐ,bₐ,outputdir*"agfem/cylHR0000_$order.csv";namex="A",namey="B")
 # write_csv(aₑ,bₑ,outputdir*"cutfem/cylHR0000_$order.csv";namex="A",namey="B")
-write_csv(aₛ,bₛ,outputdir*"sbm/cylHR0000_$order.csv";namex="A",namey="B")
+# write_csv(aₛ,bₛ,outputdir*"sbm/cylHR0000_$order.csv";namex="A",namey="B")
 
-plotter0000()
+# plotter0000()
 # show(to)
 
 
