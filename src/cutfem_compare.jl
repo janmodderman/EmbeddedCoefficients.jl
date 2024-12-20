@@ -7,7 +7,6 @@ using TimerOutputs
 using DrWatson
 using Plots
 using LinearAlgebra
-using LinearSolve
 using CSV, DataFrames
 include("helper_functions.jl")
 
