@@ -7,7 +7,6 @@
  using DrWatson
  using Plots
  using LinearAlgebra
- using LinearSolve
  using CSV, DataFrames
 
  #==============================================================================================================================#
@@ -188,7 +187,7 @@ end # function
 
 # Jacobian J(u) for the distance function d for SBM
 Ft(∇u) = TensorValue(1.0,0.0,0.0,1.0) + ∇u
-J(u) = meas∘(Ft(∇(u)))
+J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 # J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 
 # pmid1(pmid,x) = pmid - x
@@ -225,22 +224,12 @@ end # function
 
 # fast
 function Ay(A_wϕ,A_wu,A_vϕ)
-    sz  = size(A_wu)
-    # y = zeros(ComplexF64,sz[1],sz[2])
-    y1 = zeros(ComplexF64,2,2)
-    for i in 1:sz[2]
-        # u = Gridap.solve(LUSolver(),A_wϕ,A_wu[:,i])
-        # y1[i,:] = A_vϕ*u 
-
-        prob = LinearProblem(A_wϕ,A_wu[:,i])
-        sol = LinearSolve.solve(prob)
-        y1[i,:] = A_vϕ*sol.u 
-
-        # global y[i,:] = sol.u         # To avoid copy this array of size n 
-        #reshape(sol.u,(1,sz[1]))
+    y = zeros(ComplexF64,2,2)
+    for i in 1:size(A_wu)[2]
+        u = Gridap.solve(LUSolver(),A_wϕ,Vector(A_wu[:,i]))
+        y[i,:] = A_vϕ*u 
     end # for
-    # A_vϕ*y
-    y1
+    y
 end # function
 
 #==============================================================================================================================#
@@ -314,10 +303,8 @@ function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
     W,Φ,V,U = setup_spaces(order, model, Ω, num_dims(model))
 
     # required now to obtain gradient of d, TODO: find more better and elegant solution
-    Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},order)) # current implementation requires higher order to correctly get the gradient of the distance function
+    Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
     dcf = interpolate_everywhere(CellField(d,Ω),Vd)
-    # @show ∑(∫(∇(dcf)⊙∇(dcf))dΓ)
-    # @show ∫(∇(dcf)⊙∇(dcf))dΓ
     for k in Ks
         ω = √(k * g)
         a_wϕ,_,_ = weak_form(k,ω,nΓ,dΩ,dΓ,dΓf,dΓo)                          # conformal weak form (only a_wϕ)
@@ -334,6 +321,7 @@ function run_sbm(Ks, ρV, order, model, cutgeo, n, d)
         A, B = hydro_coeffs(ω,ρV,x)
         push!(added_mass, A)  
         push!(added_damping, B)
+        @show A[2,2]
         show(to)
     end # for
     (added_mass,added_damping)
@@ -440,8 +428,8 @@ pmid = VectorValue(0.0,0.0)     # [m]: center point of radius
 Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 
 # load background model, and geometry; then cut geometry into model
-# model, geo = setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
-model, geo = setup_domain(R,pmid,12.0,4.0,(1500,500),Val(2),Val(:cylinder))
+model, geo = setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
+# model, geo = setup_domain(R,pmid,12.0,4.0,(1500,500),Val(2),Val(:cylinder))
 cutgeo, cutgeo_facets = cutting_model(model,geo)
 
 # check d and n analytical
