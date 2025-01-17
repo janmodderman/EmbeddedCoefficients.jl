@@ -8,6 +8,7 @@
  using Plots
  using LinearAlgebra
  using CSV, DataFrames
+ using STLCutters
 
  #==============================================================================================================================#
 
@@ -33,13 +34,13 @@ function setup_domain(R::Float64,pmid::VectorValue,L₁::Float64,d::Float64,part
 end # function
 
 # rectangle (2D)
-function setup_domain(B::Float64,D::Float64,pmin::VectorValue,mesh::String,::Val{2},::Val{:rectangle})
+function setup_domain(D::Float64,B::Float64,pmin::VectorValue,mesh::String,::Val{2},::Val{:rectangle})
     model = GmshDiscreteModel(mesh)
     geo = quadrilateral(;x0=pmin-VectorValue(B/2,D),d1=VectorValue(B,0.0),d2=VectorValue(0.0,2*D))
     model,geo
 end # function
 
-function setup_domain(B::Float64,D::Float64,pmid::VectorValue,L₁::Float64,d::Float64,partition::Tuple,::Val{2},::Val{:rectangle})
+function setup_domain(D::Float64,B::Float64,pmid::VectorValue,L₁::Float64,d::Float64,partition::Tuple,::Val{2},::Val{:rectangle})
     pmin = Point(0.0, -d)
     pmax = Point(L₁, 0.0)
     model = CartesianDiscreteModel(pmin, pmax, partition)
@@ -81,11 +82,24 @@ end # function
 #     model,geo
 # end # function
 
+
+
+function setup_domain(mesh::String,::Val{3},::Val{:oc4})
+    model = GmshDiscreteModel(mesh)
+    geo = STLGeometry("data/meshes/oc4_nobraces.stl")
+    model,geo
+end # function
+
 #==============================================================================================================================#
 
 # CUTTING MODEL
-function cutting_model(model,geo)
-    cut(model, !geo), cut_facets(model, !geo)
+function cutting_model(model::DiscreteModel,geo)
+    cut(model, geo), cut_facets(model, geo)
+end # function
+
+function cutting_model(model::DiscreteModel,geo::STLGeometry)
+    cutgeo = cut(model, geo)
+    cutgeo, cutgeo.cutfacets
 end # function
 
 #==============================================================================================================================#
@@ -95,7 +109,7 @@ end # function
 function setup_spaces(order::Int64, model::DiscreteModel, Ω::Triangulation, cutgeo::EmbeddedDiscretization, dim::Int64)
     threshold = 1.0
     strategy = AggregateCutCellsByThreshold(threshold)
-    aggregates = aggregate(strategy, cutgeo, cutgeo.geo)
+    aggregates = aggregate(strategy, cutgeo, cutgeo.geo, OUT)
     reffe = ReferenceFE(lagrangian, Float64, order)
     Wstd = FESpace(Ω, reffe, vector_type=Vector{ComplexF64})
     W = AgFEMSpace(Wstd,aggregates)
@@ -120,10 +134,10 @@ end # function
 # SETUP TRIANGULATIONS AND MEASURES
 # Cut triangulations + quads
 function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,cutgeo_facets::EmbeddedFacetDiscretization,degree::Int64)
-    Ω = Interior(cutgeo, PHYSICAL)
-    Ω⁻act = Interior(cutgeo, ACTIVE)
+    Ω = Interior(cutgeo, PHYSICAL_OUT)
+    Ω⁻act = Interior(cutgeo, ACTIVE_OUT)
     Γ = EmbeddedBoundary(cutgeo)
-    nΓ = get_normal_vector(Γ)
+    nΓ = -get_normal_vector(Γ)
     Γf = BoundaryTriangulation(cutgeo_facets, tags=["surface"])
     dΓf = Measure(Γf, degree)
     dΩ = Measure(Ω, degree)
@@ -140,8 +154,8 @@ end # function
 
 # Surrogate triangulations + quads
 function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,degree::Int64)
-    Ω = Interior(cutgeo, IN)
-    Γ = Interface(Interior(cutgeo,ACTIVE_OUT),Ω).⁻
+    Ω = Interior(cutgeo, OUT)
+    Γ = Interface(Interior(cutgeo,ACTIVE),Ω).⁻
     dΩ = Measure(Ω, degree)
     dΓ = Measure(Γ, degree)   
     nΓ = get_normal_vector(Γ)
@@ -196,14 +210,30 @@ J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 
 # TRUE DISTANCE & NORMAL FUNCTIONS (SBM)
 # horizontal cylinder (2D)
-n(x,pmid) = (pmid-x)/√((pmid-x)⋅(pmid-x))
+n(x,pmid,::Val{:cylinder}) = (pmid-x)/√((pmid-x)⋅(pmid-x))
 # n(x,pmid) = (pmid.-x)/√((pmid.-x)⋅(pmid.-x))
 # n(x,pmid) = VectorValue(1.0,0.0)#(pmid.-x)/√((pmid.-x)⋅(pmid.-x))
-d(x,pmid,R) =  (√((pmid-x)⋅(pmid-x))-R)*n(x,pmid)
+d(x,pmid,R,::Val{:cylinder}) =  (√((pmid-x)⋅(pmid-x))-R)*n(x,pmid)
 # d(x,pmid,R) =  (√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
 # d(x,pmid,R) = pmid(x).-x#(√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
-n(pmid) = x -> n(x,pmid)
-d(pmid,R) = x -> d(x,pmid,R)
+n(pmid,::Val{:cylinder}) = x -> n(x,pmid,Val(:cylinder))
+d(pmid,R,::Val{:cylinder}) = x -> d(x,pmid,R,Val(:cylinder))
+
+function d(x,pcor,::Val{:rectangle})
+    dx = maximum([pcor[1]-x[1], 0.0, x[1]-pcor[2]])
+    dy = maximum([pcor[3]-x[2], 0.0, x[2]-pcor[4]])
+    VectorValue(-dx,dy)
+end # function
+
+function n(x,pcor,::Val{:rectangle})
+    dx = maximum([pcor[1]-x[1], 0.0, x[1]-pcor[2]])
+    dy = maximum([pcor[3]-x[2], 0.0, x[2]-pcor[4]])
+    dist = √(dx^2+dy^2)
+    VectorValue(-dx/dist,dy/dist)
+end # function
+
+d(pcor,::Val{:rectangle}) = x -> d(x,pcor,Val(:rectangle))
+n(pcor,::Val{:rectangle}) = x -> n(x,pcor,Val(:rectangle))
 
 # ∇d(x,pmid,R) = 
 #==============================================================================================================================#
@@ -322,6 +352,9 @@ function run_sbm(Ks, ρV,g, order, model, cutgeo, n, d, to)
     # required now to obtain gradient of d, TODO: find more better and elegant solution
     Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
     dcf = interpolate_everywhere(CellField(d,Ω),Vd)
+    # @show ρV2 = 1.04*(12*4-∑(∫(1.0)dΩ))
+    # @show ρV3 = (∑(∫(1.0)dΓ)/2)^2
+    # @show ρV4 = (∑(∫(J(dcf))dΓ)/2)^2
     for k in Ks
         ω = √(k * g)
         a_wϕ,_,_ = weak_form(k,ω,nΓ,dΩ,dΓ,dΓf,dΓo)                          # conformal weak form (only a_wϕ)
@@ -338,7 +371,7 @@ function run_sbm(Ks, ρV,g, order, model, cutgeo, n, d, to)
         A, B = hydro_coeffs(ω,ρV,x)
         push!(added_mass, A)  
         push!(added_damping, B)
-        @show A[2,2]
+        # @show A[2,2]
         show(to)
     end # for
     (added_mass,added_damping)
@@ -418,6 +451,76 @@ plot!(damping_plots, KRs, data3[!,iB], label="SBM p = $order",linecolor="#117733
 plot!(damping_plots,refdatad[!,1],refdatad[!,2],label="h/R=$val",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
 display(mass_plots)
 display(damping_plots)
+savefig(mass_plots,"plots/case42/A_$(name)_$order.png")
+savefig(damping_plots,"plots/case42/B_$(name)_$order.png")
+end # function
+
+function plotter_case41(name::String,val::Float64,order::Int64)
+    KRs = [0.1:0.025:2.5;]      # range of non-dimensional wave numbers
+    
+    mass_plots = plot(xlabel="k̄ [-]", ylabel="Ā₃₃ [-]")
+    damping_plots = plot(xlabel="k̄ [-]", ylabel="B̄₃₃ [-]")
+    data1 = CSV.read("data/sims/cutfem/rectHR$(name)_$order.csv",DataFrame)
+    data2 = CSV.read("data/sims/agfem/rectHR$(name)_$order.csv",DataFrame)
+    data3 = CSV.read("data/sims/sbm/rectHR$(name)_$order.csv",DataFrame)
+    # 
+    iA = 4
+    iB = 8
+    msize = 4
+ 
+    # reference data
+    # experimental
+    data_me = CSV.read("data/exp_pro/ref_rect_me.csv",DataFrame)
+    data_de = CSV.read("data/exp_pro/ref_rect_de.csv",DataFrame)
+
+    # HPC
+    data_mhpc = CSV.read("data/exp_pro/ref_rect_mhpc.csv",DataFrame)
+    data_dhpc = CSV.read("data/exp_pro/ref_rect_dhpc.csv",DataFrame)
+
+    # linear FEM
+    data_mfem1 = CSV.read("data/exp_pro/ref_rect_mfem1.csv",DataFrame)
+    data_dfem1 = CSV.read("data/exp_pro/ref_rect_dfem1.csv",DataFrame)
+
+    # quadratic FEM
+    data_mfem2 = CSV.read("data/exp_pro/ref_rect_mfem2.csv",DataFrame)
+    data_dfem2 = CSV.read("data/exp_pro/ref_rect_dfem2.csv",DataFrame)
+
+    # linear XFEM
+    data_mxfem1 = CSV.read("data/exp_pro/ref_rect_mxfem1.csv",DataFrame)
+    data_dxfem1 = CSV.read("data/exp_pro/ref_rect_dxfem1.csv",DataFrame)
+
+    # quadratic XFEM
+    data_mxfem2 = CSV.read("data/exp_pro/ref_rect_mxfem2.csv",DataFrame)
+    data_dxfem2 = CSV.read("data/exp_pro/ref_rect_dxfem2.csv",DataFrame)
+
+    plot!(mass_plots, KRs, data1[!,iA], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
+    plot!(mass_plots, KRs, data2[!,iA], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
+    plot!(mass_plots, KRs, data3[!,iA], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
+
+    scatter!(mass_plots, data_me[!,1], data_me[!,2], label="experiments",markershape=:cross,markercolor=:black)#,markershape=:diamond)
+    plot!(mass_plots,data_mfem1[!,1],data_mfem1[!,2],label="FEM p=1",linecolor="#44AA99", linestyle=:dash,markershape=:+,markercolor="#44AA99",markersize=msize)
+    plot!(mass_plots,data_mfem2[!,1],data_mfem2[!,2],label="FEM p=2",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+    plot!(mass_plots,data_mxfem1[!,1],data_mxfem1[!,2],label="XFEM p=1",linecolor="#88CCEE", linestyle=:dash,markershape=:utriangle,markercolor="#88CCEE",markersize=msize)
+    plot!(mass_plots,data_mxfem2[!,1],data_mxfem2[!,2],label="XFEM p=2",linecolor="#DDCC77", linestyle=:dash,markershape=:dtriangle,markercolor="#DDCC77",markersize=msize)
+    plot!(mass_plots,data_mhpc[!,1],data_mhpc[!,2],label="HPC",linecolor="#882255", linestyle=:dash,markershape=:circle,markercolor="#882255",markersize=msize)
+    
+
+    scatter!(damping_plots, data_de[!,1], data_de[!,2], label="experiments",markershape=:cross,markercolor=:black)#,markershape=:diamond)
+    plot!(damping_plots,data_dfem1[!,1],data_dfem1[!,2],label="FEM p=1",linecolor="#44AA99", linestyle=:dash,markershape=:+,markercolor="#44AA99",markersize=msize)
+    plot!(damping_plots,data_dfem2[!,1],data_dfem2[!,2],label="FEM p=2",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+    plot!(damping_plots,data_dxfem1[!,1],data_dxfem1[!,2],label="XFEM p=1",linecolor="#88CCEE", linestyle=:dash,markershape=:utriangle,markercolor="#88CCEE",markersize=msize)
+    plot!(damping_plots,data_dxfem2[!,1],data_dxfem2[!,2],label="XFEM p=2",linecolor="#DDCC77", linestyle=:dash,markershape=:dtriangle,markercolor="#DDCC77",markersize=msize)
+    plot!(damping_plots,data_dhpc[!,1],data_dhpc[!,2],label="HPC",linecolor="#882255", linestyle=:dash,markershape=:circle,markercolor="#882255",markersize=msize)
+
+
+    
+    plot!(damping_plots, KRs, data1[!,iB], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
+    plot!(damping_plots, KRs, data2[!,iB], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
+    plot!(damping_plots, KRs, data3[!,iB], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
+    display(mass_plots)
+    display(damping_plots)
+    savefig(mass_plots,"plots/case41/A_$(name)_$order.png")
+    savefig(damping_plots,"plots/case41/B_$(name)_$order.png")
 end # function
 
 # to = TimerOutput()

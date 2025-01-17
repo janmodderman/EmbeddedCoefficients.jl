@@ -1,4 +1,4 @@
-module study41
+module study42
 using Gridap, Gridap.Arrays, Gridap.FESpaces, Gridap.Fields, Gridap.Geometry, Gridap.TensorValues
 using GridapEmbedded, GridapEmbedded.Interfaces, GridapEmbedded.LevelSetCutters
 using GridapGmsh
@@ -28,23 +28,23 @@ Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 HR_ratios = [0.0,0.342, 0.643, 0.809, 0.906]
 HR_names = ["0000","0342", "0643", "0809", "0906"]
 
-for (i,HR) in enumerate(HR_ratios)
-    name="cylHR"*HR_names[i]
-    pmid=VectorValue(0.0,-HR*R)
-    # load background model, and geometry; then cut geometry into model
-    model, geo = helpers.setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
-    cutgeo, cutgeo_facets = helpers.cutting_model(model,geo)
+# for (i,HR) in enumerate(HR_ratios)
+#     name="cylHR"*HR_names[i]
+#     pmid=VectorValue(0.0,-HR*R)
+#     # load background model, and geometry; then cut geometry into model
+#     model, geo = helpers.setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
+#     cutgeo, cutgeo_facets = helpers.cutting_model(model,geo)
 
-    # run case for agfem, cutfem or sbm
-    (aₐ,bₐ) = helpers.run_agfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets,to)
-    (aₑ,bₑ) = helpers.run_cutfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets, γg, h,to)
-    (aₛ,bₛ) = helpers.run_sbm(Ks, ρV,g, order, model, cutgeo, helpers.n(pmid), helpers.d(pmid,R),to)
+#     # run case for agfem, cutfem or sbm
+#     (aₐ,bₐ) = helpers.run_agfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets,to)
+#     (aₑ,bₑ) = helpers.run_cutfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets, γg, h,to)
+#     (aₛ,bₛ) = helpers.run_sbm(Ks, ρV,g, order, model, cutgeo, helpers.n(pmid), helpers.d(pmid,R),to)
 
-    helpers.write_csv(aₐ,bₐ,outputdir*"agfem/"*name*"_$order.csv";namex="A",namey="B")
-    helpers.write_csv(aₑ,bₑ,outputdir*"cutfem/"*name*"_$order.csv";namex="A",namey="B")
-    helpers.write_csv(aₛ,bₛ,outputdir*"sbm/"*name*"_$order.csv";namex="A",namey="B")
+#     helpers.write_csv(aₐ,bₐ,outputdir*"agfem/"*name*"_$order.csv";namex="A",namey="B")
+#     helpers.write_csv(aₑ,bₑ,outputdir*"cutfem/"*name*"_$order.csv";namex="A",namey="B")
+#     helpers.write_csv(aₛ,bₛ,outputdir*"sbm/"*name*"_$order.csv";namex="A",namey="B")
 
-end # for
+# end # for
 
 for (i,HR) in enumerate(HR_ratios)
     helpers.plotter_case42(HR_names[i],HR,order)
