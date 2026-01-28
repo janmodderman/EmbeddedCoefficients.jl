@@ -14,10 +14,10 @@ to = TimerOutput()
 # global variables      
 g = 9.81                    # [kg m/s²]: gravitational constant
 KRs = [0.1:0.025:2.0;]      # range of non-dimensional wave numbers
-order = 1                   # order of elements, either 1 or 2
+order = 2                   # order of elements, either 1 or 2
 γg = 0.1                    # GP stabilization parameter 
 h = 0.0035                  # smallest element size in background mesh
-outputdir = "data/sims/"   # output directory
+outputdir = "data/sims/sims/"   # output directory
 
 # case specific variables
 R = 0.1                         # [m]: radius
@@ -32,14 +32,16 @@ HR_names = ["0000","0342", "0643", "0809", "0906"]
 #     name="cylHR"*HR_names[i]
 #     pmid=VectorValue(0.0,-HR*R)
 #     # load background model, and geometry; then cut geometry into model
-#     model, geo = helpers.setup_domain(R,pmid,"data/meshes/background_shapes4.msh",Val(2),Val(:cylinder))
+#     model, geo = helpers.setup_domain(R,pmid,"data/meshes/background_shapes2.msh",Val(2),Val(:cylinder))
 #     cutgeo, cutgeo_facets = helpers.cutting_model(model,geo)
 
 #     # run case for agfem, cutfem or sbm
 #     (aₐ,bₐ) = helpers.run_agfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets,to)
+#     println(aₐ,bₐ)
 #     (aₑ,bₑ) = helpers.run_cutfem(Ks, ρV,g, order, model, cutgeo, cutgeo_facets, γg, h,to)
-#     (aₛ,bₛ) = helpers.run_sbm(Ks, ρV,g, order, model, cutgeo, helpers.n(pmid), helpers.d(pmid,R),to)
-
+#     println(aₑ,bₑ)
+#     (aₛ,bₛ) = helpers.run_sbm(Ks, ρV,g, order, model, cutgeo, helpers.n(pmid,Val(:cylinder)), helpers.d(pmid,R,Val(:cylinder)),to)
+ 
 #     helpers.write_csv(aₐ,bₐ,outputdir*"agfem/"*name*"_$order.csv";namex="A",namey="B")
 #     helpers.write_csv(aₑ,bₑ,outputdir*"cutfem/"*name*"_$order.csv";namex="A",namey="B")
 #     helpers.write_csv(aₛ,bₛ,outputdir*"sbm/"*name*"_$order.csv";namex="A",namey="B")

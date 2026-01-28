@@ -83,6 +83,54 @@ end # function
 # end # function
 
 
+function spheroid(R; x0=zero(Point{3,eltype(R)}), name="spheroid")
+    println(typeof(x0))
+    function spheroidfun(x)
+      _spheroid(x, R, x0)
+    end
+  
+    box = _spheroid_box(R, x0)
+    tree = GridapEmbedded.LevelSetCutters.Leaf((spheroidfun, name, box))
+    GridapEmbedded.LevelSetCutters.AnalyticalGeometry(tree)
+end
+  
+function _spheroid_box(R, x0)
+    e = 1.01
+    pmin = x0 .- e .* R
+    pmax = x0 .+ e .* R
+    GridapEmbedded.LevelSetCutters.BoundingBox(pmin, pmax)
+end
+  
+@inline function _spheroid(x::Point, R, x0)
+    w = x - x0
+    # A = w⋅w - R⋅R
+    # A = (w.^2)./(R.^2) - 1
+    A = (w./R)⋅(w./R) - 1
+    # A = sum((w[i]^2 / R[i]^2) for i in 1:3) - 1
+    A
+end
+
+function setup_domain(a::Float64,pmid::VectorValue,pts,n,::Val{3},::Val{:sphere})
+    model = CartesianDiscreteModel(pts,n)
+    labels = get_face_labeling(model)  # get the face labeling of model_Γ 
+    add_tag_from_tags!(labels, "surface", [22])                                                            
+    add_tag_from_tags!(labels, "seabed", [21])                                                                                                                      
+    add_tag_from_tags!(labels, "inlet", [25])                                                            
+    add_tag_from_tags!(labels, "outlet", [23,24,26]) 
+    geo = sphere(a,x0=pmid)
+    model,geo
+end # function
+
+function setup_domain(a::Float64,c::Float64,pmid::VectorValue,pts,n,::Val{3},::Val{:spheroid})
+    model = CartesianDiscreteModel(pts,n)
+    labels = get_face_labeling(model)  # get the face labeling of model_Γ 
+    add_tag_from_tags!(labels, "surface", [22])                                                            
+    add_tag_from_tags!(labels, "seabed", [21])                                                                                                                      
+    add_tag_from_tags!(labels, "inlet", [25])                                                            
+    add_tag_from_tags!(labels, "outlet", [23,24,26]) 
+    geo = spheroid(VectorValue(a,a,c),x0=pmid)
+    model,geo
+end # function
 
 function setup_domain(mesh::String,::Val{3},::Val{:oc4})
     model = GmshDiscreteModel(mesh)
@@ -94,7 +142,8 @@ end # function
 
 # CUTTING MODEL
 function cutting_model(model::DiscreteModel,geo)
-    cut(model, geo), cut_facets(model, geo)
+    cut(model, !geo), cut_facets(model, !geo)
+    # cut(model, geo), cut_facets(model, geo)
 end # function
 
 function cutting_model(model::DiscreteModel,geo::STLGeometry)
@@ -109,7 +158,8 @@ end # function
 function setup_spaces(order::Int64, model::DiscreteModel, Ω::Triangulation, cutgeo::EmbeddedDiscretization, dim::Int64)
     threshold = 1.0
     strategy = AggregateCutCellsByThreshold(threshold)
-    aggregates = aggregate(strategy, cutgeo, cutgeo.geo, OUT)
+    aggregates = aggregate(strategy, cutgeo, cutgeo.geo)
+    # aggregates = aggregate(strategy, cutgeo, cutgeo.geo, OUT)
     reffe = ReferenceFE(lagrangian, Float64, order)
     Wstd = FESpace(Ω, reffe, vector_type=Vector{ComplexF64})
     W = AgFEMSpace(Wstd,aggregates)
@@ -133,11 +183,36 @@ end # function
 
 # SETUP TRIANGULATIONS AND MEASURES
 # Cut triangulations + quads
-function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,cutgeo_facets::EmbeddedFacetDiscretization,degree::Int64)
-    Ω = Interior(cutgeo, PHYSICAL_OUT)
-    Ω⁻act = Interior(cutgeo, ACTIVE_OUT)
+# function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,cutgeo_facets::EmbeddedFacetDiscretization,degree::Int64)
+#     Ω = Interior(cutgeo, PHYSICAL_OUT)
+#     writevtk(Ω,"data/cutmodelHR")
+#     Ω⁻act = Interior(cutgeo, ACTIVE_OUT)
+#     Γ = EmbeddedBoundary(cutgeo)
+#     nΓ = -get_normal_vector(Γ)
+#     Γf = BoundaryTriangulation(cutgeo_facets, tags=["surface"])
+#     dΓf = Measure(Γf, degree)
+#     dΩ = Measure(Ω, degree)
+#     dΓ = Measure(Γ, degree)
+#     Γi = BoundaryTriangulation(model, tags=["inlet"])
+#     dΓi = Measure(Γi, degree)
+#     Γo = BoundaryTriangulation(model, tags=["outlet"])
+#     dΓo = Measure(Γo, degree)
+#     E = GhostSkeleton(cutgeo,ACTIVE_OUT)
+#     dE = Measure(E,degree)
+#     nE = get_normal_vector(E)
+#     (Ω,Ω⁻act,Γ,Γf,Γi,Γo,E),(nΓ,nE),(dΩ,dΓ,dΓf,dΓi,dΓo,dE)
+# end # function
+
+
+function setup_interiors(model,cutgeo,cutgeo_facets,degree;name="")
+    Ω = Interior(cutgeo, PHYSICAL)
+    writevtk(Ω,"data/cutmodelHR")
+
+    # writevtk(Ω,"cutmodelHR"*name)
+    Ω⁻act = Interior(cutgeo, ACTIVE)
+    # writevtk(Ω⁻act,"activemodelHR"*name)
     Γ = EmbeddedBoundary(cutgeo)
-    nΓ = -get_normal_vector(Γ)
+    nΓ = get_normal_vector(Γ)
     Γf = BoundaryTriangulation(cutgeo_facets, tags=["surface"])
     dΓf = Measure(Γf, degree)
     dΩ = Measure(Ω, degree)
@@ -152,10 +227,12 @@ function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,cut
     (Ω,Ω⁻act,Γ,Γf,Γi,Γo,E),(nΓ,nE),(dΩ,dΓ,dΓf,dΓi,dΓo,dE)
 end # function
 
+
 # Surrogate triangulations + quads
-function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,degree::Int64)
-    Ω = Interior(cutgeo, OUT)
-    Γ = Interface(Interior(cutgeo,ACTIVE),Ω).⁻
+function setup_interiors(model,cutgeo,degree;name="")
+    Ω = Interior(cutgeo, IN)
+    # writevtk(Ω,"sbmmodelHR"*name)
+    Γ = Interface(Interior(cutgeo,ACTIVE_OUT),Ω).⁻
     dΩ = Measure(Ω, degree)
     dΓ = Measure(Γ, degree)   
     nΓ = get_normal_vector(Γ)
@@ -167,6 +244,20 @@ function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,deg
     dΓo = Measure(Γo, degree)
     (Ω,Γ,Γf,Γi,Γo),(nΓ,),(dΩ,dΓ,dΓf,dΓi,dΓo)
 end # function
+# function setup_interiors(model::DiscreteModel,cutgeo::EmbeddedDiscretization,degree::Int64)
+#     Ω = Interior(cutgeo, OUT)
+#     Γ = Interface(Interior(cutgeo,ACTIVE),Ω).⁻
+#     dΩ = Measure(Ω, degree)
+#     dΓ = Measure(Γ, degree)   
+#     nΓ = get_normal_vector(Γ)
+#     Γf = BoundaryTriangulation(Ω, tags=["surface"])
+#     dΓf = Measure(Γf, degree)
+#     Γi = BoundaryTriangulation(model, tags=["inlet"])
+#     dΓi = Measure(Γi, degree)
+#     Γo = BoundaryTriangulation(model, tags=["outlet"])
+#     dΓo = Measure(Γo, degree)
+#     (Ω,Γ,Γf,Γi,Γo),(nΓ,),(dΩ,dΓ,dΓf,dΓi,dΓo)
+# end # function
 
 #==============================================================================================================================#
 
@@ -185,14 +276,14 @@ function weak_form(nE,dE,γg,h,::Val{1})
     (w,ϕ) -> ∫( (γg*(h^3)) * (jump(nE⋅∇(w)) ⊙ jump(nE⋅∇(ϕ))) )dE
 end # function
 # GP second order
-function weak_form(nE,dE,γg,h,::Val{1})
+function weak_form(nE,dE,γg,h,::Val{2})
     (w,ϕ) -> ∫( (γg*(h^3)) * (jump(nE⋅∇(w)) ⊙ jump(nE⋅∇(ϕ))) + (γg*(h^5)) * jump(nE⋅∇∇(w)) ⊙ jump(nE⋅∇∇(ϕ)) )dE
 end # function
 
 # SBM weak form := conformal weak form + shifted Neumann + shifted hydrodynamic BC
-function weak_form(ω::Float64,nΓ::CellField,dΓ::Measure,n::Function,d::Function,dcf::FEFunction)
+function weak_form(ω::Float64,nΓ::CellField,dΓ::Measure,n::Function,d::Function,dcf::FEFunction,dims)
     a_wϕ = (ϕ, w) -> ∫(w*(n⋅nΓ)*((∇∇(ϕ)⋅d + ∇(ϕ))⋅n) - w* ∇(ϕ)⋅nΓ)dΓ
-    a_vϕ = (ϕ, v) -> ∫( (im*ω* (-1.0))*( ϕ + (∇(ϕ)⋅d)) * (v⋅n) *(nΓ⋅n) * J(dcf))dΓ
+    a_vϕ = (ϕ, v) -> ∫( (im*ω* (-1.0))*( ϕ + (∇(ϕ)⋅d)) * (v⋅n) *(nΓ⋅n) * J(dcf,dims))dΓ
     a_wu = (u, w) -> ∫( im*ω*w*(n⋅nΓ)*(u⋅n) )dΓ
     a_wϕ,a_vϕ,a_wu
 end # function
@@ -200,8 +291,9 @@ end # function
 #==============================================================================================================================#
 
 # Jacobian J(u) for the distance function d for SBM
-Ft(∇u) = TensorValue(1.0,0.0,0.0,1.0) + ∇u
-J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
+Ft(∇u,::Val{2}) = TensorValue(1.0,0.0,0.0,1.0) + ∇u
+Ft(∇u,::Val{3}) = TensorValue(1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0) + ∇u
+J(u,dims) = (Ft(∇(u),Val(dims)))⊙(Ft(∇(u),Val(dims)))
 # J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 
 # pmid1(pmid,x) = pmid - x
@@ -209,15 +301,40 @@ J(u) = (Ft(∇(u)))⊙(Ft(∇(u)))
 
 
 # TRUE DISTANCE & NORMAL FUNCTIONS (SBM)
-# horizontal cylinder (2D)
+"""
+    HORIZONTAL CYLINDER (2D)
+"""
 n(x,pmid,::Val{:cylinder}) = (pmid-x)/√((pmid-x)⋅(pmid-x))
 # n(x,pmid) = (pmid.-x)/√((pmid.-x)⋅(pmid.-x))
 # n(x,pmid) = VectorValue(1.0,0.0)#(pmid.-x)/√((pmid.-x)⋅(pmid.-x))
-d(x,pmid,R,::Val{:cylinder}) =  (√((pmid-x)⋅(pmid-x))-R)*n(x,pmid)
+d(x,pmid,R,::Val{:cylinder}) =  (√((pmid-x)⋅(pmid-x))-R)*n(x,pmid,Val(:cylinder))
 # d(x,pmid,R) =  (√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
 # d(x,pmid,R) = pmid(x).-x#(√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
 n(pmid,::Val{:cylinder}) = x -> n(x,pmid,Val(:cylinder))
 d(pmid,R,::Val{:cylinder}) = x -> d(x,pmid,R,Val(:cylinder))
+
+"""
+    SPHERE (3D)
+"""
+n(x,pmid,::Val{:sphere}) = (pmid-x)/√((pmid-x)⋅(pmid-x))
+# n(x,pmid) = (pmid.-x)/√((pmid.-x)⋅(pmid.-x))
+# n(x,pmid) = VectorValue(1.0,0.0)#(pmid.-x)/√((pmid.-x)⋅(pmid.-x))
+d(x,pmid,R,::Val{:sphere}) =  (√((pmid-x)⋅(pmid-x))-R)*n(x,pmid,Val(:sphere))
+# d(x,pmid,R) =  (√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
+# d(x,pmid,R) = pmid(x).-x#(√((pmid.-x)⋅(pmid.-x))-R)*n(x,pmid)
+n(pmid,::Val{:sphere}) = x -> n(x,pmid,Val(:sphere))
+d(pmid,R,::Val{:sphere}) = x -> d(x,pmid,R,Val(:sphere))
+
+
+# d(x,pmid,R,::Val{:spheroid}) = x-closest_point_on_spheroid(x, R, pmid)
+# function n(x,pmid,R,::Val{:spheroid}) 
+#     di=d(x,pmid,R,Val(:spheroid))
+#     di./(di⋅di)
+# end
+
+# n(pmid,R,::Val{:spheroid}) = x -> n(x,pmid,R,Val(:spheroid))
+# d(pmid,R,::Val{:spheroid}) = x -> d(x,pmid,R,Val(:spheroid))
+
 
 function d(x,pcor,::Val{:rectangle})
     dx = maximum([pcor[1]-x[1], 0.0, x[1]-pcor[2]])
@@ -352,13 +469,14 @@ function run_sbm(Ks, ρV,g, order, model, cutgeo, n, d, to)
     # required now to obtain gradient of d, TODO: find more better and elegant solution
     Vd= FESpace(Ω,ReferenceFE(lagrangian,VectorValue{num_dims(model),Float64},3)) # current implementation requires higher order to correctly get the gradient of the distance function
     dcf = interpolate_everywhere(CellField(d,Ω),Vd)
+    writevtk(Ω,"data/test1",cellfields=["dcf"=>dcf])
     # @show ρV2 = 1.04*(12*4-∑(∫(1.0)dΩ))
     # @show ρV3 = (∑(∫(1.0)dΓ)/2)^2
     # @show ρV4 = (∑(∫(J(dcf))dΓ)/2)^2
     for k in Ks
         ω = √(k * g)
         a_wϕ,_,_ = weak_form(k,ω,nΓ,dΩ,dΓ,dΓf,dΓo)                          # conformal weak form (only a_wϕ)
-        a_wϕₛ,a_vϕ,a_wu = weak_form(ω,nΓ,dΓ,n,d,dcf)                            # shifted contributions (on a_wϕ, a_vϕ and a_uw)
+        a_wϕₛ,a_vϕ,a_wu = weak_form(ω,nΓ,dΓ,n,d,dcf,num_dims(model))                            # shifted contributions (on a_wϕ, a_vϕ and a_uw)
         A_wϕ = assemble_matrix(a_wϕ, Φ, W)                                  # assemble conformal matrix contributions
         # A_wϕₛ,A_wu,A_vϕ = assemble_matrices(a_wϕₛ,a_wu,a_vϕ,W,V,Φ,U)        # assemble shifted matrix contributions
         A_wϕₛ = assemble_matrix(a_wϕₛ, Φ, W) 
@@ -430,25 +548,28 @@ KRs = [0.1:0.025:2.0;]      # range of non-dimensional wave numbers
 
 mass_plots = plot(xlabel="k̄ [-]", ylabel="Ā₃₃ [-]")
 damping_plots = plot(xlabel="k̄ [-]", ylabel="B̄₃₃ [-]")
-data1 = CSV.read("data/sims/cutfem/cylHR$(name)_$order.csv",DataFrame)
-data2 = CSV.read("data/sims/agfem/cylHR$(name)_$order.csv",DataFrame)
-data3 = CSV.read("data/sims/sbm/cylHR$(name)_$order.csv",DataFrame)
+data1 = CSV.read("data/sims/sims/cutfem/cylHR$(name)_$order.csv",DataFrame)
+data2 = CSV.read("data/sims/sims/agfem/cylHR$(name)_$order.csv",DataFrame)
+data3 = CSV.read("data/sims/sims/sbm/cylHR$(name)_$order.csv",DataFrame)
 # 
 iA = 4
 iB = 8
 msize = 4
-plot!(mass_plots, KRs, data1[!,iA], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
-plot!(mass_plots, KRs, data2[!,iA], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
-plot!(mass_plots, KRs, data3[!,iA], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
+plot!(mass_plots, KRs, data1[!,iA], label="CutFEM p=$order",linecolor="#332288")#,markershape=:circle)
+plot!(mass_plots, KRs, data2[!,iA], label="AgFEM p=$order",linecolor="#CC6677")#,markershape=:cross)
+plot!(mass_plots, KRs, data3[!,iA], label="SBM p=$order",linecolor="#117733")#,markershape=:diamond)
 refdatam = CSV.read("data/exp_pro/ref_cyl_me_HR$name.csv",DataFrame)
-refdatad = CSV.read("data/exp_pro/ref_cyl_de_HR$name.csv",DataFrame)
+# refdatad = CSV.read("data/exp_pro/damping$name.csv",DataFrame)
+refdatad = CSV.read("data/exp_pro/damping$name.csv",DataFrame)
+refdatad_ewt = CSV.read("data/exp_pro/damping_ewt$name.csv",DataFrame)
 
-plot!(mass_plots,refdatam[!,1],refdatam[!,2],label="h/R=$val",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+scatter!(mass_plots,refdatam[!,1][begin:1:end],refdatam[!,2][begin:1:end],label="RMH h/R=$val",markershape=:x,markercolor="#AA4499",markersize=msize)
 
-plot!(damping_plots, KRs, data1[!,iB], label="CutFEM p = $order",linecolor="#332288")#,markershape=:circle)
-plot!(damping_plots, KRs, data2[!,iB], label="AgFEM p = $order",linecolor="#CC6677")#,markershape=:cross)
-plot!(damping_plots, KRs, data3[!,iB], label="SBM p = $order",linecolor="#117733")#,markershape=:diamond)
-plot!(damping_plots,refdatad[!,1],refdatad[!,2],label="h/R=$val",linecolor="#AA4499", linestyle=:dash,markershape=:x,markercolor="#AA4499",markersize=msize)
+plot!(damping_plots, KRs, data1[!,iB], label="CutFEM p=$order",linecolor="#332288")#,markershape=:circle)
+plot!(damping_plots, KRs, data2[!,iB], label="AgFEM p=$order",linecolor="#CC6677")#,markershape=:cross)
+plot!(damping_plots, KRs, data3[!,iB], label="SBM p=$order",linecolor="#117733")#,markershape=:diamond)
+scatter!(damping_plots,refdatad[!,1][begin:3:end],refdatad[!,2][begin:3:end],label="RMH h/R=$val",markershape=:x,markercolor="#AA4499",markersize=msize)
+scatter!(damping_plots,refdatad_ewt[!,1][begin:3:end],refdatad_ewt[!,2][begin:3:end],label="EWT h/R=$val",markershape=:ltriangle,markercolor="#000000",markersize=msize)
 display(mass_plots)
 display(damping_plots)
 savefig(mass_plots,"plots/case42/A_$(name)_$order.png")

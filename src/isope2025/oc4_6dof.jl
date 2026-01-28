@@ -37,10 +37,12 @@ fs = [0.01:0.025:0.8;]
 
 
 for (i,HR) in enumerate(HR_ratios)
-    name="OC4"
+    name="OC4_test"
     # load background model, and geometry; then cut geometry into model
     # model, geo = helpers.setup_domain("data/meshes/background_oc4.msh",Val(3),Val(:oc4))
-    model = GmshDiscreteModel("data/meshes/background_oc4_c11.msh",orient_if_simplex=false)
+    model = GmshDiscreteModel("data/meshes/backoc3_1m.msh",orient_if_simplex=false)
+    writevtk(model,"data/meshes/model_example")
+    stop
     geo = STLGeometry("data/meshes/oc4.stl")
     # geo = sphere(30)
     # model = simplexify(model1,positive=true)
