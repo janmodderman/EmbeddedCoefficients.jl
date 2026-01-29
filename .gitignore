@@ -433,3 +433,4 @@ Manifest.toml
 *.jpeg
 *.zip
 *.tex
+*.msh
