@@ -414,11 +414,12 @@ $RECYCLE.BIN/
 ## Acknowledgements
 # Many thanks to `https://gitignore.io/`, written and maintained by Joe Blau, which contributed much material to this gitignore file.
 
+src/old_code/
+scripts/old_code/
 
 *.vtu
 *.pvd
 *.pvtu
-Manifest.toml
 
 *.png
 *.pdf
