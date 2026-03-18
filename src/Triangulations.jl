@@ -26,7 +26,7 @@ function _setup_physical_tris(cutgeo, cutgeo_facets, degree)
     Ω_act = Interior(cutgeo, ACTIVE_OUT)
     Γ     = EmbeddedBoundary(cutgeo)
     nΓ    = -get_normal_vector(Γ)
-    Γf    = BoundaryTriangulation(cutgeo_facets, tags=["surface"])
+    Γf    = BoundaryTriangulation(cutgeo_facets, PHYSICAL_OUT, tags=["surface"])
     dΩ    = Measure(Ω,  degree)
     dΓ    = Measure(Γ,  degree)
     dΓf   = Measure(Γf, degree)
@@ -65,12 +65,12 @@ function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::CUTFEM, la
     return Triangulations(Ω, Ω_act, Γ, Γf, E, lat_tris), Measures(dΩ, dΓ, dΓf, dE, lat_meas), Normals(nΓ, nE, lat_norms)
 end
 
-function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::SBM)
+function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::SBM, lateral_tags::LateralTags)
     Ω     = Interior(cutgeo, OUT)
     Γ     = Interface(Interior(cutgeo, ACTIVE_IN), Ω).⁻
     nΓ    = get_normal_vector(Γ)
     Γf    = BoundaryTriangulation(Ω, tags=["surface"])
-    lat_tris, lat_meas = _lateral_boundaries(model, degree, lateral_tags)
+    lat_tris, lat_norms, lat_meas = _lateral_boundaries(model, degree, lateral_tags)
     dΩ  = Measure(Ω,  degree)
     dΓ  = Measure(Γ,  degree)
     dΓf = Measure(Γf, degree)
