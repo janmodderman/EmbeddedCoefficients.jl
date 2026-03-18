@@ -1,4 +1,5 @@
 using STLCutters
+using GridapEmbedded.Interfaces: SubFacetTriangulation
 abstract type EmbeddedGeometry{N} end
 
 # 2D
@@ -55,7 +56,7 @@ end
 # Distances — levelset function
 # ===================================================
 function distances(bgmodel::DiscreteModel,
-                    Γ::BoundaryTriangulation,
+                    Γ::Triangulation,
                     geo::Union{Circle,Sphere}, degree::Int)
 
     Dspace   = num_point_dims(Γ)
@@ -65,25 +66,23 @@ function distances(bgmodel::DiscreteModel,
     z        = zero(VectorValue{Dspace, Float64})
     d_vec_cs = CellState(z, QΓ)
     n_vec_cs = CellState(z, QΓ)
-    Xd_cs    = CellState(z, QΓ)
 
     for (icell, cell) in enumerate(qcp.cell_phys_point)
         for (ipoint, point) in enumerate(cell)
             δ    = pmid - point          # vector from point to center
             absδ = sqrt(δ ⋅ δ)
             δ̂    = δ / absδ
-            Xd   = pmid - geo.R * δ̂     # point on boundary closest to x
+            Xd   = pmid - geo.radius * δ̂     # point on boundary closest to x
             d    = Xd - point
             absd = sqrt(d ⋅ d)
             n    = absd > 0 ? d / absd : δ̂
 
             d_vec_cs.values[icell][ipoint] = d
             n_vec_cs.values[icell][ipoint] = n
-            Xd_cs.values[icell][ipoint]    = Xd
         end
     end
 
-    return d_vec_cs, n_vec_cs, Xd_cs
+    return d_vec_cs, n_vec_cs
 end # function
 
 # ===================================================
@@ -108,7 +107,6 @@ function distances(bgmodel::DiscreteModel,
     z        = zero(VectorValue{Dspace, Float64})
     d_vec_cs = CellState(z, QΓ)
     n_vec_cs = CellState(z, QΓ)
-    Xd_cs = CellState(z, QΓ)
 
     for (icell, cell) in enumerate(qcp.cell_phys_point)
         Xc = STLCutters.closest_point(cell, geo,
@@ -117,11 +115,10 @@ function distances(bgmodel::DiscreteModel,
             δ = Xc[ipoint] - point
             d_vec_cs.values[icell][ipoint] = δ
             n_vec_cs.values[icell][ipoint] = δ / √(δ ⋅ δ)
-            Xd_cs.values[icell][ipoint] = point + d_vec_cs.values[icell][ipoint]
         end
     end
 
-    return d_vec_cs, n_vec_cs, Xd_cs
+    return d_vec_cs, n_vec_cs
 end # function
 
 # ===================================================
@@ -130,22 +127,35 @@ end # function
 struct DistanceData
     d::CellState    # distance vector
     n::CellState    # normal vector
-    Xd::CellState   # shifted point
 end # struct
 
 # ===================================================
-# Wrappers for each unfitted method: SBM or WSBM
+# Wrappers for each unfitted method: SBM 
 # ===================================================
 function compute_distances(::SBM, bgmodel::DiscreteModel,
                             geo::EmbeddedGeometry, Γ::BoundaryTriangulation,
-                            fun::Function, degree::Int, t::Real)
-    d, n, Xd = distances(bgmodel, Γ, geo, degree)
-    return DistanceData(d, n, Xd)
+                            degree::Int, t::Real)
+    d, n = distances(bgmodel, Γ, geo, degree)
+    return DistanceData(d, n)
+end # function
+
+function compute_distances(::SBM, bgmodel::DiscreteModel,
+                            geo::EmbeddedGeometry, Γ::Triangulation,
+                            degree::Int, t::Real)
+    d, n = distances(bgmodel, Γ, geo, degree)
+    return DistanceData(d, n)
 end # function
 
 function compute_distances(::SBM, bgmodel::DiscreteModel,
                             geo::STLGeometry, Γ::BoundaryTriangulation,
-                            fun::Function, degree::Int, t::Real)
-    d, n, Xd = distances(bgmodel, Γ, geo, degree)
-    return DistanceData(d, n, Xd)
+                            degree::Int, t::Real)
+    d, n = distances(bgmodel, Γ, geo, degree)
+    return DistanceData(d, n)
 end # function
+
+# AGFEM/CUTFEM — no distances needed
+function compute_distances(::Union{AGFEM,CUTFEM}, bgmodel::DiscreteModel,
+                            geo::EmbeddedGeometry, Γ::SubFacetTriangulation,
+                            degree::Int, t::Real)
+    return nothing
+end

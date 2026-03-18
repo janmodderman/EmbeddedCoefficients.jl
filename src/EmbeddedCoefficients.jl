@@ -28,6 +28,7 @@ include("Solver.jl")         # depends on everything — must be last
 
 export EmbeddingMethod
 export AGFEM, CUTFEM, SBM, WSBM
+export label
 
 # ---------------------------------------------------------------
 # Public API — geometry

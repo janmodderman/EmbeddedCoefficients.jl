@@ -22,12 +22,23 @@ struct GmshDomain{N} <: BackgroundMesh{N}
     meshfile::String
 end
 
+function _build_cartesian_2d(d::CartesianDomain{2}, ::WallWall)
+    pmin = Point(-d.L₁, -d.depth)
+    pmax = Point( d.L₁,  0.0)
+    CartesianDiscreteModel(pmin, pmax, d.partition)
+end
+
+function _build_cartesian_2d(d::CartesianDomain{2}, ::SymmetryInlet)
+    pmin = Point(0.0,  -d.depth)
+    pmax = Point(d.L₁,  0.0)
+    CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]))
+end
+
 # Build the Gridap model + apply boundary tags
 function setup_model(d::CartesianDomain{2})
-    pmin  = Point(0.0, -d.depth)
-    pmax  = Point(d.L₁, 0.0)
-    model = CartesianDiscreteModel(pmin, pmax, d.partition)
+    model = _build_cartesian_2d(d, d.lateral_tag)
     _tag_2d!(model, d.lateral_tag)
+    writevtk(model,"data/bgmodel2D")
     return model
 end
 
