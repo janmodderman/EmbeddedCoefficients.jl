@@ -32,6 +32,21 @@ struct VerticalCylinder <: EmbeddedGeometry{3}
     draft::Float64    # D
 end
 
+struct OC3 <: EmbeddedGeometry{3}
+    folder::String
+    center::VectorValue{3,Float64}
+end
+
+struct OC4 <: EmbeddedGeometry{3}
+    folder::String
+    center::VectorValue{3,Float64}
+end
+
+struct STL <: EmbeddedGeometry{3}
+    folder::String
+    center::VectorValue{3,Float64}
+end
+
 # Each geometry knows how to produce its Gridap levelset object
 function gridap_geo(g::Circle)
     disk(g.radius, x0=g.center)
@@ -51,6 +66,18 @@ function gridap_geo(g::VerticalCylinder)
     bottom = g.center - VectorValue(0.0, 0.0, -g.draft)
     cylinder(g.radius; x0=bottom, v=VectorValue(0, 0, 1))
 end
+
+function gridap_geo(g::OC3)
+    STLGeometry(g.folder)
+end 
+
+function gridap_geo(g::OC4)
+    STLGeometry(g.folder)
+end 
+
+function gridap_geo(g::STL)
+    STLGeometry(g.folder)
+end 
 
 # ===================================================
 # Distances — levelset function
@@ -139,12 +166,12 @@ function compute_distances(::SBM, bgmodel::DiscreteModel,
     return DistanceData(d, n)
 end # function
 
-function compute_distances(::SBM, bgmodel::DiscreteModel,
-                            geo::EmbeddedGeometry, Γ::Triangulation,
-                            degree::Int, t::Real)
-    d, n = distances(bgmodel, Γ, geo, degree)
-    return DistanceData(d, n)
-end # function
+# function compute_distances(::SBM, bgmodel::DiscreteModel,
+#                             geo::EmbeddedGeometry, Γ::Triangulation,
+#                             degree::Int, t::Real)
+#     d, n = distances(bgmodel, Γ, geo, degree)
+#     return DistanceData(d, n)
+# end # function
 
 function compute_distances(::SBM, bgmodel::DiscreteModel,
                             geo::STLGeometry, Γ::BoundaryTriangulation,

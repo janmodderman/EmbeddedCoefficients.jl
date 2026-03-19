@@ -1,12 +1,10 @@
-# src/EmbeddedCoefficients.jl
-
 module EmbeddedCoefficients
-
 using Gridap
 using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.Algebra
 using GridapEmbedded
+using STLCutters
 
 # ---------------------------------------------------------------
 # Internal files — order matters for dependencies
@@ -23,7 +21,7 @@ include("PostProcess.jl")    # depends on assembly.jl
 include("Solver.jl")         # depends on everything — must be last
 
 # ---------------------------------------------------------------
-# Public API — methods
+# Public API — Methods.jl
 # ---------------------------------------------------------------
 
 export EmbeddingMethod
@@ -31,16 +29,16 @@ export AGFEM, CUTFEM, SBM, WSBM
 export label
 
 # ---------------------------------------------------------------
-# Public API — geometry
+# Public API — Geometry.jl
 # ---------------------------------------------------------------
 
 export EmbeddedGeometry, AnalyticalGeometry
 export Circle, Rectangle, Triangle       # 2D
-export VerticalCylinder                  # 3D
+export VerticalCylinder, OC3, OC4                  # 3D
 export gridap_geo                        # for advanced users
 
 # ---------------------------------------------------------------
-# Public API — domain
+# Public API — Domain.jl
 # ---------------------------------------------------------------
 
 export BackgroundMesh
@@ -50,32 +48,18 @@ export LateralBC, WallWall, SymmetryInlet
 export setup_model
 
 # ---------------------------------------------------------------
-# Public API — problem definition
-# ---------------------------------------------------------------
-
-export SimulationParams
-export DomainParams, SolverParams        # if kept as standalone structs
-export ManufacturedParams                # MMS verification
-
-# ---------------------------------------------------------------
-# Public API — solver (main entry point)
+# Public API — Solver.jl
 # ---------------------------------------------------------------
 
 export SimulationParams
 export coeff_solve
 
 # ---------------------------------------------------------------
-# Public API — results
+# Public API — PostProcess.jl
 # ---------------------------------------------------------------
 
 export HydroCoefficients
 export hydro_coeffs
-
-# ---------------------------------------------------------------
-# Public API — output / postprocessing
-# ---------------------------------------------------------------
-
-export write_triangulations
 
 # ---------------------------------------------------------------
 # Advanced / internal — exported for power users and testing

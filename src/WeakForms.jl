@@ -69,15 +69,12 @@ function _to_cellstate(f::CellField, dΓ::Measure, z)
   result
 end
 
-
 function _cross(r::CellState, nΓ::CellField,
                 geometry::EmbeddedGeometry{N}, dΓ::Measure) where N
   z    = zero(VectorValue{N,Float64})
   n_cs = _to_cellstate(nΓ, dΓ, z)
   _cross(r, n_cs, geometry, dΓ)
 end
-
-
 
 # =======================================
 
@@ -116,6 +113,7 @@ function _J_cs(geometry::EmbeddedGeometry, dist::CellState, dΓ::Measure)
   )
 end
 
+# TODO: for SBM the _arm should be to the true boundary, not the surrogate boundary
 function _arm(geometry::EmbeddedGeometry{N}, dΓ::Measure) where N
     x_ref     = geometry.center
     qcp       = get_cell_points(get_cell_quadrature(dΓ)).cell_phys_point
@@ -128,47 +126,6 @@ function _arm(geometry::EmbeddedGeometry{N}, dΓ::Measure) where N
     end 
     r_vec_cs
 end
-
-# # helper when nΓ::CellField -> CellState
-# function _cross(r::CellState, nΓ::CellField, geometry::EmbeddedGeometry{N}, dΓ::Measure) where N
-#     qcp       = get_cell_points(get_cell_quadrature(dΓ)).cell_phys_point
-#     z         = zero(VectorValue{N, Float64})
-#     n_vec_cs  = CellState(z, dΓ)
-#     for (icell, cell) in enumerate(qcp)
-#         for (ipoint, point) in enumerate(cell)
-#           @show point
-#             n_vec_cs.values[icell][ipoint] = nΓ(point)
-#         end 
-#     end
-#     return _cross(r, n_vec_cs, geometry, dΓ)
-# end 
-
-# # 2D: scalar z-component of cross product
-# function _cross(r::CellState, nΓ::CellState, ::EmbeddedGeometry{2}, dΓ::Measure)
-#     qcp       = get_cell_points(get_cell_quadrature(dΓ)).cell_phys_point
-#     z         = 0.0
-#     n_vec_cs  = CellState(z, dΓ)
-#     for (icell, cell) in enumerate(qcp)
-#         for (ipoint, point) in enumerate(cell)
-#             n_vec_cs.values[icell][ipoint] = r.values[icell][ipoint][1]*nΓ.values[icell][ipoint][2] - 
-#                                               r.values[icell][ipoint][2]*nΓ.values[icell][ipoint][1]
-#         end 
-#     end
-#     return n_vec_cs
-# end
-
-# # 3D: full vector cross product
-# function _cross(r::CellState, nΓ::Union{CellState,CellField}, ::EmbeddedGeometry{3}, dΓ::Measure)
-#     qcp       = get_cell_points(get_cell_quadrature(dΓ)).cell_phys_point
-#     z         = zero(VectorValue{3, Float64})
-#     n_vec_cs  = CellState(z, dΓ)
-#     for (icell, cell) in enumerate(qcp)
-#         for (ipoint, point) in enumerate(cell)
-#             n_vec_cs.values[icell][ipoint] = r.values[icell][ipoint] × nΓ.values[icell][ipoint]
-#         end 
-#     end
-#     return n_vec_cs
-# end
 
 # ---------------------------------------------------------------
 # Private base terms — shared across AGFEM, CUTFEM

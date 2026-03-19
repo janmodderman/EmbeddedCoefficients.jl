@@ -15,7 +15,7 @@ struct WallWall     <: LateralTags end    # both inlet and outlet = wall
 
 # Convenience constructors
 CartesianDomain2D(L₁, depth, partition; lateral_tag=WallWall()) = CartesianDomain{2}(L₁, 0.0, depth, partition, lateral_tag)
-CartesianDomain3D(L₁, L₂, depth, partition) = CartesianDomain{3}(L₁, L₂, depth, partition)
+CartesianDomain3D(L₁, L₂, depth, partition; lateral_tag=WallWall()) = CartesianDomain{3}(L₁, L₂, depth, partition, lateral_tag)
 
 # External Gmsh mesh
 struct GmshDomain{N} <: BackgroundMesh{N}
@@ -24,7 +24,7 @@ end
 
 function _build_cartesian_2d(d::CartesianDomain{2}, ::WallWall)
     pmin = Point(-d.L₁, -d.depth)
-    pmax = Point( d.L₁,  0.0)
+    pmax = Point(d.L₁,  0.0)
     CartesianDiscreteModel(pmin, pmax, d.partition)
 end
 
@@ -38,13 +38,12 @@ end
 function setup_model(d::CartesianDomain{2})
     model = _build_cartesian_2d(d, d.lateral_tag)
     _tag_2d!(model, d.lateral_tag)
-    writevtk(model,"data/bgmodel2D")
     return model
 end
 
 function setup_model(d::CartesianDomain{3})
     pmin  = Point(-d.L₁/2, -d.L₂/2, -d.depth)
-    pmax  = Point( d.L₁/2,  d.L₂/2,  0.0)
+    pmax  = Point(d.L₁/2,  d.L₂/2,  0.0)
     model = CartesianDiscreteModel(pmin, pmax, d.partition)
     _tag_3d!(model)
     return model
@@ -75,7 +74,6 @@ function _tag_3d!(model)
     add_tag_from_tags!(labels, "seabed",  [21])
     add_tag_from_tags!(labels, "surface", [22])
     add_tag_from_tags!(labels, "walls", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
-    # walls/inlet/outlet TBD once 3D Cartesian is re-enabled
 end
 
 function cut_model(model::DiscreteModel, geo::AnalyticalGeometry)
@@ -84,5 +82,5 @@ end
 
 function cut_model(model::DiscreteModel, geo::STLGeometry)
     cutgeo = cut(model, geo)
-    return cutgeo, cutgeo.cutfacets
+    return cutgeo.cut, cut_facets(cutgeo)
 end

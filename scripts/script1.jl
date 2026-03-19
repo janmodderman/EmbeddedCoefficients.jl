@@ -8,17 +8,17 @@ R = 0.1                         # [m]: radius
 ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
 Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 g = 9.81
-n = 350
+n = 100
 
 p1=plot()
 p2=plot()
 
 # Shared domain + geometry
 geometry = Circle(VectorValue(0.0, 0.0), R)
-println("domain length: ",1.0/KRs[1])
+println("domain length: ",1.0/Ks[1])
 println("domain depth: ",20*R)
-domain   = CartesianDomain2D(1.0/KRs[1], 20*R, (5*n,n), lateral_tag=SymmetryInlet())
-# domain   = CartesianDomain2D(1.0/KRs[1], 20*R, (5*n,n), lateral_tag=WallWall())
+domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (5*n,n), lateral_tag=SymmetryInlet())
+# domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (5*n,n), lateral_tag=WallWall())
 
 
 # Run for each method and save
