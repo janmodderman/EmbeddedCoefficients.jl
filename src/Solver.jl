@@ -29,27 +29,28 @@ function setup_simulation(params::SimulationParams)
     return SimulationState(meas, norms, spaces, dist)
 end     
 
+function pre_assemble(params::SimulationParams, setup::SimulationState)
+    # 5. Weak forms
+    a_wϕ = make_a_wϕ(params.method, setup.meas, setup.norms, setup.dist)
+    a_wu = make_a_wu(params.method, params.geometry, setup.norms, setup.meas, setup.dist)
+    a_vϕ = make_a_vϕ(params.method, params.geometry, setup.norms, setup.meas, setup.dist)
+
+    # 6. Assembly
+    assemble_matrices(a_wϕ, a_wu, a_vϕ, setup.spaces)
+end 
+
+
 """
     solve(params::SimulationParams, ω::Float64, k::Float64, ρV::Float64)
         -> HydroCoefficients
 
 Run the full pipeline for any EmbeddingMethod defined in SimulationParams.
 """
-# TODO: can we pre-construct the matrices and then multiply by k, ω or products of these so we only have to assemble once?
 # TODO: look into variable domain size per wavenumber k
 # TODO: can we store ω in the function?
 # TODO: do we want to pass ρV or calculate it inside?
-function coeff_solve(params::SimulationParams, setup::SimulationState, ω::Float64, k::Float64, ρV::Float64, g::Float64)
-
-    # 5. Weak forms
-    a_wϕ = make_a_wϕ(params.method, k, ω, g, setup.meas, setup.norms, setup.dist)
-    a_wu = make_a_wu(params.method, ω, params.geometry, setup.norms, setup.meas, setup.dist)
-    a_vϕ = make_a_vϕ(params.method, ω, params.geometry, setup.norms, setup.meas, setup.dist)
-
-    # 6. Assembly + solve
-    matrices = assemble_matrices(a_wϕ, a_wu, a_vϕ, setup.spaces)
-    y        = solve_system(matrices)
-
+function coeff_solve(matrices::AssembledMatrices, ω::Float64, k::Float64, ρV::Float64)
+    y        = solve_system(matrices, k, ω)
     # 7. Extract coefficients
     hydro_coeffs(y, ω, ρV)
 end

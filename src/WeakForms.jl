@@ -128,15 +128,17 @@ function _arm(geometry::EmbeddedGeometry{N}, dΓ::Measure) where N
 end
 
 # ---------------------------------------------------------------
-# Private base terms — shared across AGFEM, CUTFEM
+# Private base terms — shared across AGFEM, CUTFEM, SBM
 # ---------------------------------------------------------------
 
-function _a_base_wϕ(k::Float64, ω::Float64, g::Float64,
-                    dΩ::Measure, dΓf::Measure, lat_meas::NamedTuple)
-  dΓw = lat_meas.wall
-  (ϕ, w) -> ∫( ∇(ϕ)⋅∇(w) )dΩ -
-             ∫( (ω^2/g) * w*ϕ )dΓf -
-             ∫( im*k * ϕ*w )dΓw
+function _independent_a_base_wϕ(dΩ::Measure)
+    (ϕ, w) -> ∫( ∇(ϕ)⋅∇(w) )dΩ
+end
+
+function _k_dependent_a_base_wϕ(dΓf::Measure, lat_meas::NamedTuple)
+    dΓw = lat_meas.wall
+    (ϕ, w) ->  ∫( (-1.0)* w*ϕ )dΓf -
+             ∫( im * ϕ*w )dΓw
 end
 
 function _a_sbm_wϕ(nΓ::CellField, dΓ::Measure, dist::DistanceData)
@@ -161,22 +163,28 @@ function _a_ghost(dE, nE, h::Float64, γg::Float64, ::Val{N}) where {N}
   error("Ghost penalty not implemented for order $N")
 end
 
-# ---------------------------------------------------------------
-# Public interface — make_a_wϕ
-# ---------------------------------------------------------------
-
-function make_a_wϕ(::Union{AGFEM,CUTFEM}, k::Float64, ω::Float64, g::Float64,
-                    meas::Measures, norms::Normals,
-                    dist::Nothing)
-  _a_base_wϕ(k, ω, g, meas.dΩ, meas.dΓf, meas.lateral)
+# test PRE-Assemble
+struct WeakForm
+    dep::Union{Function,Nothing}
+    indep::Union{Function,Nothing}
 end
 
-function make_a_wϕ(::SBM, k::Float64, ω::Float64, g::Float64,
+# ---------------------------------------------------------------
+# Public interface — make_a_wϕ      Note that we will assume here that ω²/g = k
+# ---------------------------------------------------------------
+
+function make_a_wϕ(::Union{AGFEM,CUTFEM},
                     meas::Measures, norms::Normals,
-                    dist::DistanceData)
-  a_base = _a_base_wϕ(k, ω, g, meas.dΩ, meas.dΓf, meas.lateral)
-  a_sbm  = _a_sbm_wϕ(norms.nΓ, meas.dΓ, dist)
-  (ϕ, w) -> a_base(ϕ, w) + a_sbm(ϕ, w)
+                    dist::Nothing)
+    WeakForm(_k_dependent_a_base_wϕ(meas.dΓf, meas.lateral), _independent_a_base_wϕ(meas.dΩ))
+end
+
+function make_a_wϕ(::SBM,
+                    meas::Measures, norms::Normals,
+                    dist::Nothing)
+    a_base = _independent_a_base_wϕ(meas.dΩ)
+    a_sbm = _a_sbm_wϕ(norms.nΓ, meas.dΓ, dist)
+    WeakForm(_k_dependent_a_base_wϕ(meas.dΓf, meas.lateral), (ϕ, w) -> a_base(ϕ, w) + a_sbm(ϕ, w))
 end
 
 # ---------------------------------------------------------------
@@ -184,18 +192,18 @@ end
 # ---------------------------------------------------------------
 
 # --- 2D ---
-function make_a_wu(::Union{AGFEM,CUTFEM}, ω::Float64,
+function make_a_wu(::Union{AGFEM,CUTFEM},
                       geometry::EmbeddedGeometry{2},
                       norms::Normals, meas::Measures, dist::Nothing)
     id_t, id_r = _motion_tensors(geometry)
     r          = _arm(geometry, meas.dΓ)
     nΓ         = norms.nΓ
     r_cross_nΓ = _cross(r, nΓ, geometry, meas.dΓ)     # returns scalar valued CellState
-    (u, w) -> ∫( w * im*ω * ((id_t⋅u)⋅nΓ)   )meas.dΓ +
-              ∫( w * im*ω * _to_scalar(id_r⋅u)*r_cross_nΓ  )meas.dΓ
+    WeakForm((u, w) -> ∫( w * im * ((id_t⋅u)⋅nΓ)   )meas.dΓ +
+              ∫( w * im * _to_scalar(id_r⋅u)*r_cross_nΓ  )meas.dΓ, nothing)
 end
 
-function make_a_wu(::SBM, ω::Float64,
+function make_a_wu(::SBM,
                     geometry::EmbeddedGeometry{2},
                     norms::Normals, meas::Measures, dist::DistanceData)
     id_t, id_r = _motion_tensors(geometry)
@@ -203,23 +211,23 @@ function make_a_wu(::SBM, ω::Float64,
     nΓ          = norms.nΓ
     n           = dist.n
     r_cross_n   = _cross(r, n, geometry, meas.dΓ)     # returns scalar values CellState
-    (u, w) -> ∫( w * im*ω * (n⋅nΓ) * ((id_t⋅u)⋅n)       )meas.dΓ +
-              ∫( w * im*ω * (n⋅nΓ) * (_to_scalar(id_r⋅u)*r_cross_n) )meas.dΓ
+    WeakForm((u, w) -> ∫( w * im * (n⋅nΓ) * ((id_t⋅u)⋅n)       )meas.dΓ +
+              ∫( w * im * (n⋅nΓ) * (_to_scalar(id_r⋅u)*r_cross_n) )meas.dΓ, nothing)
 end
 
 # --- 3D ---
-function make_a_wu(::Union{AGFEM,CUTFEM}, ω::Float64,
+function make_a_wu(::Union{AGFEM,CUTFEM},
                     geometry::EmbeddedGeometry{3},
                     norms::Normals, meas::Measures,  dist::Nothing)
     id_t, id_r = _motion_tensors(geometry)
     r           = _arm(geometry, meas.dΓ)
     nΓ          = norms.nΓ
     r_cross_nΓ  = _cross(r, nΓ, geometry, meas.dΓ)
-    (u, w) -> ∫( w * im*ω * ((id_t⋅u)⋅nΓ)       )meas.dΓ +
-              ∫( w * im*ω * ((id_r⋅u)⋅r_cross_nΓ) )meas.dΓ
+    WeakForm((u, w) -> ∫( w * im * ((id_t⋅u)⋅nΓ)       )meas.dΓ +
+              ∫( w * im * ((id_r⋅u)⋅r_cross_nΓ) )meas.dΓ, nothing)
 end
 
-function make_a_wu(::SBM, ω::Float64,
+function make_a_wu(::SBM,
                     geometry::EmbeddedGeometry,
                     norms::Normals, meas::Measures, dist::DistanceData)
     id_t, id_r = _motion_tensors(geometry)
@@ -227,8 +235,8 @@ function make_a_wu(::SBM, ω::Float64,
     nΓ          = norms.nΓ
     n           = dist.n
     r_cross_n   = _cross(r, n, geometry, meas.dΓ)
-    (u, w) -> ∫( w * im*ω * (n⋅nΓ) * ((id_t⋅u)⋅n)       )meas.dΓ +
-              ∫( w * im*ω * (n⋅nΓ) * ((id_r⋅u)⋅r_cross_n) )meas.dΓ
+    WeakForm((u, w) -> ∫( w * im * (n⋅nΓ) * ((id_t⋅u)⋅n)       )meas.dΓ +
+              ∫( w * im * (n⋅nΓ) * ((id_r⋅u)⋅r_cross_n) )meas.dΓ, nothing)
 end
 
 # ---------------------------------------------------------------
@@ -236,18 +244,18 @@ end
 # ---------------------------------------------------------------
 
 # --- 2D ---
-function make_a_vϕ(::Union{AGFEM,CUTFEM}, ω::Float64,
+function make_a_vϕ(::Union{AGFEM,CUTFEM},
                       geometry::EmbeddedGeometry{2},
                       norms::Normals, meas::Measures, dist::Nothing)
     id_t, id_r = _motion_tensors(geometry)
     r           = _arm(geometry, meas.dΓ)
     nΓ          = norms.nΓ
     r_cross_nΓ  = _cross(r, nΓ, geometry, meas.dΓ)    # returns scalar valuded CellState
-    (ϕ, v) -> ∫( ((id_t⋅v)⋅nΓ)         * im*ω*ϕ * (-1.0) )meas.dΓ +
-              ∫( (_to_scalar(id_r⋅v)*r_cross_nΓ) * im*ω*ϕ * (-1.0) )meas.dΓ
+    WeakForm((ϕ, v) -> ∫( ((id_t⋅v)⋅nΓ)         * im*ϕ * (-1.0) )meas.dΓ +
+              ∫( (_to_scalar(id_r⋅v)*r_cross_nΓ) * im*ϕ * (-1.0) )meas.dΓ, nothing)
 end
 
-function make_a_vϕ(::SBM, ω::Float64,
+function make_a_vϕ(::SBM,
                       geometry::EmbeddedGeometry{2},
                       norms::Normals, meas::Measures, dist::DistanceData)
     id_t, id_r = _motion_tensors(geometry)
@@ -256,23 +264,23 @@ function make_a_vϕ(::SBM, ω::Float64,
     d, n        = dist.d, dist.n
     J_cs        = _J_cs(geometry, d, meas.dΓ)
     r_cross_n   = _cross(r, n, geometry, meas.dΓ)   # returns scalar valuded CellState
-    (ϕ, v) -> ∫( im*ω * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_t⋅v)⋅n)         * (nΓ⋅n) * J_cs )meas.dΓ +
-              ∫( im*ω * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * (_to_scalar(id_r⋅v)*r_cross_n) * (nΓ⋅n) * J_cs )meas.dΓ
+    WeakForm((ϕ, v) -> ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_t⋅v)⋅n)         * (nΓ⋅n) * J_cs )meas.dΓ +
+              ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * (_to_scalar(id_r⋅v)*r_cross_n) * (nΓ⋅n) * J_cs )meas.dΓ, nothing)
 end
 
 # --- 3D ---
-function make_a_vϕ(::Union{AGFEM,CUTFEM}, ω::Float64,
+function make_a_vϕ(::Union{AGFEM,CUTFEM},
                       geometry::EmbeddedGeometry{3},
                       norms::Normals, meas::Measures, dist::Nothing)
     id_t, id_r = _motion_tensors(geometry)
     r           = _arm(geometry, meas.dΓ)
     nΓ          = norms.nΓ
     r_cross_nΓ  = _cross(r, nΓ, geometry, meas.dΓ)
-    (ϕ, v) -> ∫( ((id_t⋅v)⋅nΓ)         * im*ω*ϕ * (-1.0) )meas.dΓ +
-              ∫( ((id_r⋅v)⋅r_cross_nΓ) * im*ω*ϕ * (-1.0) )meas.dΓ
+    WeakForm((ϕ, v) -> ∫( ((id_t⋅v)⋅nΓ)         * im*ϕ * (-1.0) )meas.dΓ +
+              ∫( ((id_r⋅v)⋅r_cross_nΓ) * im*ϕ * (-1.0) )meas.dΓ, nothing)
 end
 
-function make_a_vϕ(::SBM, ω::Float64,
+function make_a_vϕ(::SBM,
                       geometry::EmbeddedGeometry{3},
                       norms::Normals, meas::Measures, dist::DistanceData)
     id_t, id_r = _motion_tensors(geometry)
@@ -281,8 +289,8 @@ function make_a_vϕ(::SBM, ω::Float64,
     d, n        = dist.d, dist.n
     J_cs        = _J_cs(geometry, d, meas.dΓ)
     r_cross_n   = _cross(r, n, geometry, meas.dΓ)
-    (ϕ, v) -> ∫( im*ω * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_t⋅v)⋅n)         * (nΓ⋅n) * J_cs )meas.dΓ +
-              ∫( im*ω * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_r⋅v)⋅r_cross_n) * (nΓ⋅n) * J_cs )meas.dΓ
+    WeakForm((ϕ, v) -> ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_t⋅v)⋅n)         * (nΓ⋅n) * J_cs )meas.dΓ +
+              ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_r⋅v)⋅r_cross_n) * (nΓ⋅n) * J_cs )meas.dΓ, nothing)
 end
 
 # ---------------------------------------------------------------
