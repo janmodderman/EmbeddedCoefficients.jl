@@ -19,12 +19,25 @@ function _setup_constant_space(model::DiscreteModel)
     return V, U
 end
 
+function _aggregate(strategy, cut_disc::DiscreteCut, ::AnalyticalGeometry)
+    aggregate(strategy, cut_disc.cut, cut_disc.geo, OUT)
+end
+
+function _aggregate(strategy, cut_disc::DiscreteCut, ::STLGeometry)
+    aggregate(strategy, cut_disc.stl, cut_disc.geo, OUT)
+end
+
+# public entry point — no conditionals at call site
+function _aggregate(strategy, cut_disc::DiscreteCut)
+    _aggregate(strategy, cut_disc, cut_disc.geo)
+end
+
 # Returns Aggregated test and trial FE Space for the velocity potential, and test and trial space for displacement
 function setup_spaces(order::Int64, model::DiscreteModel, Ω::Triangulation,
-                        cutgeo::Union{EmbeddedDiscretization}, ::AGFEM,
+                        cut::DiscreteCut, ::AGFEM,
                         threshold::Float64=1.0)
     strategy   = AggregateCutCellsByThreshold(threshold)
-    aggregates = aggregate(strategy, cutgeo, cutgeo.geo, OUT)
+    aggregates = _aggregate(strategy, cut)
 
     reffe = ReferenceFE(lagrangian, Float64, order)
     Wstd  = FESpace(Ω, reffe, vector_type=Vector{ComplexF64})
@@ -36,7 +49,7 @@ end
 
 # Returns test and trial FE Space for the velocity potential, and test and trial space for displacement
 function setup_spaces(order::Int64, model::DiscreteModel, Ω::Triangulation,
-                        cutgeo::EmbeddedDiscretization,
+                        cut::DiscreteCut,
                         ::Union{CUTFEM,SBM})
     reffe = ReferenceFE(lagrangian, Float64, order)
     W     = FESpace(Ω, reffe, vector_type=Vector{ComplexF64})

@@ -4,7 +4,9 @@ using Gridap.Geometry
 using Gridap.FESpaces
 using Gridap.Algebra
 using GridapEmbedded
+using GridapEmbedded.Interfaces
 using STLCutters
+using STLCutters: STLEmbeddedDiscretization
 
 # ---------------------------------------------------------------
 # Internal files — order matters for dependencies
@@ -46,13 +48,14 @@ export CartesianDomain, GmshDomain
 export CartesianDomain2D, CartesianDomain3D
 export LateralBC, WallWall, SymmetryInlet
 export setup_model
+# export DiscreteCut
 
 # ---------------------------------------------------------------
 # Public API — Solver.jl
 # ---------------------------------------------------------------
 
-export SimulationParams
-export coeff_solve
+export SimulationParams, SimulationState
+export coeff_solve, setup_simulation
 
 # ---------------------------------------------------------------
 # Public API — PostProcess.jl

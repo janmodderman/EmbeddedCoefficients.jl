@@ -76,11 +76,19 @@ function _tag_3d!(model)
     add_tag_from_tags!(labels, "walls", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
 end
 
+# container for results from cutting the background model
+struct DiscreteCut 
+    geo::Union{AnalyticalGeometry,STLGeometry}
+    cut::EmbeddedDiscretization
+    facets::EmbeddedFacetDiscretization
+    stl::Union{STLEmbeddedDiscretization,Nothing}
+end
+
 function cut_model(model::DiscreteModel, geo::AnalyticalGeometry)
-    return cut(model, geo), cut_facets(model, geo)
+    return DiscreteCut(geo, cut(model, geo), cut_facets(model, geo), nothing)
 end
 
 function cut_model(model::DiscreteModel, geo::STLGeometry)
     cutgeo = cut(model, geo)
-    return cutgeo.cut, cut_facets(cutgeo)
+    return DiscreteCut(geo, cutgeo.cut, cut_facets(cutgeo), cutgeo)
 end

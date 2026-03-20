@@ -10,7 +10,7 @@ Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 g = 9.81
 
 ωs = sqrt.(Ks.*g)
-n = 40
+n = 20
 
 depth = 320.0       # [m]: depth
 
@@ -27,12 +27,12 @@ domain   = CartesianDomain3D(2.0/Ks[1], 2.0/Ks[1], depth, (n,n,2*n))
 
 
 # Run for each method and save
-for method in [CUTFEM(order=1)]
+for method in [AGFEM(order=1)]
 # for method in [AGFEM(order=1), CUTFEM(order=1), SBM(order=1), SBM(order=2)]
     added_mass = Vector{Float64}()
     added_damping = Vector{Float64}()
     params = SimulationParams(domain, geometry, method)
-
+    setup = setup_simulation(params)
     for k in Ks
         ω = √(k * g)
 
@@ -42,7 +42,7 @@ for method in [CUTFEM(order=1)]
         # println("domain length: ",L)
         # println("domain depth: ",depth)
         # params = SimulationParams(domain, geometry, method)
-        coeffs = coeff_solve(params, ω, k, 1.0, g)
+        coeffs = coeff_solve(params, setup, ω, k, 1.0, g)
 
         display(coeffs.added_mass.*1025)
         display(coeffs.added_damping.*1025)
