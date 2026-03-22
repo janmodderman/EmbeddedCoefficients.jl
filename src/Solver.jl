@@ -47,10 +47,8 @@ end
 Run the full pipeline for any EmbeddingMethod defined in SimulationParams.
 """
 # TODO: look into variable domain size per wavenumber k
-# TODO: can we store ω in the function?
 # TODO: do we want to pass ρV or calculate it inside?
-function coeff_solve(matrices::AssembledMatrices, ω::Float64, k::Float64, ρV::Float64)
-    y        = solve_system(matrices, k, ω)
-    # 7. Extract coefficients
+function coeff_solve(cache::SolverCache, matrices::AssembledMatrices, ω::Float64, k::Float64, ρV::Float64)
+    y        = solve_system(cache, matrices, k, ω)
     hydro_coeffs(y, ω, ρV)
 end

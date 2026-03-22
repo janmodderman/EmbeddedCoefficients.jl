@@ -4,13 +4,13 @@ struct SystemMatrices
     A_vϕ
 end
 
-function assemble_matrices(a_wϕ::Function, a_wu::Function, a_vϕ::Function,
-                            spaces::FESpaces)
-    A_wϕ = assemble_matrix(a_wϕ, spaces.Φ, spaces.W)
-    A_wu = assemble_matrix(a_wu, spaces.U, spaces.W)
-    A_vϕ = assemble_matrix(a_vϕ, spaces.Φ, spaces.V)
-    SystemMatrices(A_wϕ, A_wu, A_vϕ)
-end
+# function assemble_matrices(a_wϕ::Function, a_wu::Function, a_vϕ::Function,
+#                             spaces::FESpaces)
+#     A_wϕ = assemble_matrix(a_wϕ, spaces.Φ, spaces.W)
+#     A_wu = assemble_matrix(a_wu, spaces.U, spaces.W)
+#     A_vϕ = assemble_matrix(a_vϕ, spaces.Φ, spaces.V)
+#     SystemMatrices(A_wϕ, A_wu, A_vϕ)
+# end
 
 struct AssembledMatrices
     dep::SystemMatrices
@@ -22,7 +22,8 @@ function _assemble_matrix(fun::Function, U, V)
 end
 
 function _assemble_matrix(fun::Nothing, U, V)
-    spzeros(ComplexF64, num_free_dofs(V), num_free_dofs(U))
+    # spzeros(ComplexF64, num_free_dofs(V), num_free_dofs(U))
+    nothing
 end
 
 function assemble_matrices(a_wϕ::WeakForm, a_wu::WeakForm, a_vϕ::WeakForm, spaces::FESpaces)
@@ -34,23 +35,30 @@ function assemble_matrices(a_wϕ::WeakForm, a_wu::WeakForm, a_vϕ::WeakForm, spa
                             _assemble_matrix(a_vϕ.indep, spaces.Φ, spaces.V)))
 end
 
-"""
-Solve the system A_wϕ \\ A_wu for each column and project via A_vϕ.
-Returns the y matrix of size (n_dof × n_dof).
-"""
-function solve_system(matrices::AssembledMatrices, k::Float64, ω::Float64)
+struct SolverCache
+    n::Int64        
+    y::Matrix{<:ComplexF64}
+    u::Vector{<:ComplexF64}
+    ns::Gridap.Algebra.LUNumericalSetup
+end
 
-    # A_wϕ, A_wu, A_vϕ = matrices.dep.A_wϕ*k + matrices.indep.A_wϕ, matrices.dep.A_wu*k, matrices.dep.A_vϕ*k
-    A_wϕ, A_wu, A_vϕ = matrices.dep.A_wϕ*k + matrices.indep.A_wϕ, matrices.dep.A_wu*ω + matrices.indep.A_wu, matrices.dep.A_vϕ*ω + matrices.indep.A_vϕ
-
-    sz = size(A_wu)
-    y  = zeros(ComplexF64, sz[2], sz[2])
+function setup_cache(matrices::AssembledMatrices)
+    A_wϕ = matrices.dep.A_wϕ + matrices.indep.A_wϕ
     ss = symbolic_setup(LUSolver(), A_wϕ)
     ns = numerical_setup(ss, A_wϕ)
+    A_wu = matrices.dep.A_wu
+    n = size(A_wu)[2]
     u  = similar(Vector{ComplexF64}(A_wu[:,1]))
-    for i in 1:sz[2]
-        u       = Gridap.Algebra.solve!(u, ns, Vector{ComplexF64}(A_wu[:,i]))
-        y[i,:]  = A_vϕ * u
+    y  = zeros(ComplexF64, n, n)
+    SolverCache(n,y,u,ns)
+end
+
+function solve_system(cache::SolverCache, matrices::AssembledMatrices, k::Float64, ω::Float64)
+    A_wϕ, A_wu, A_vϕ = matrices.dep.A_wϕ*k + matrices.indep.A_wϕ, matrices.dep.A_wu*ω, matrices.dep.A_vϕ*ω
+    numerical_setup!(cache.ns, A_wϕ)
+    for i in 1:cache.n
+        Gridap.Algebra.solve!(cache.u, cache.ns, Vector{ComplexF64}(A_wu[:,i]))
+        cache.y[i,:]  = A_vϕ * cache.u
     end
-    y
+    cache.y
 end

@@ -8,6 +8,7 @@ using GridapEmbedded.Interfaces
 using STLCutters
 using STLCutters: STLEmbeddedDiscretization
 using SparseArrays
+using LinearAlgebra
 
 # ---------------------------------------------------------------
 # Internal files — order matters for dependencies
@@ -55,8 +56,8 @@ export setup_model
 # Public API — Solver.jl
 # ---------------------------------------------------------------
 
-export SimulationParams, SimulationState
-export coeff_solve, setup_simulation, pre_assemble
+export SimulationParams, SimulationState, SolverCache
+export coeff_solve, setup_simulation, pre_assemble, setup_cache
 
 # ---------------------------------------------------------------
 # Public API — PostProcess.jl
