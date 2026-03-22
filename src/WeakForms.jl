@@ -181,7 +181,7 @@ end
 
 function make_a_wϕ(::SBM,
                     meas::Measures, norms::Normals,
-                    dist::Nothing)
+                    dist::DistanceData)
     a_base = _independent_a_base_wϕ(meas.dΩ)
     a_sbm = _a_sbm_wϕ(norms.nΓ, meas.dΓ, dist)
     WeakForm(_k_dependent_a_base_wϕ(meas.dΓf, meas.lateral), (ϕ, w) -> a_base(ϕ, w) + a_sbm(ϕ, w))

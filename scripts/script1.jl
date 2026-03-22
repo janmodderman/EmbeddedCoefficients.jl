@@ -8,9 +8,9 @@ R = 0.1                         # [m]: radius
 ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
 Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 g = 9.81
-n = 100
+n = 200
 
-p1=plot()
+p1=plot(xlabel="k̄ [-]",ylabel="Cₐ [-]")
 p2=plot()
 
 # Shared domain + geometry
@@ -22,17 +22,17 @@ domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (5*n,n), lateral_tag=SymmetryInlet
 
 
 # Run for each method and save
-# for method in [SBM(order=1)]
-for method in [AGFEM(order=1), CUTFEM(order=1), SBM(order=1), SBM(order=2)]
-    added_mass = Vector{Float64}()
-    added_damping = Vector{Float64}()
+for method in [AGFEM(order=1), CUTFEM(order=1), SBM(order=1)]
+    added_mass      = Vector{Float64}()
+    added_damping   = Vector{Float64}()
+    params          = SimulationParams(domain, geometry, method)
+    setup           = setup_simulation(params)
+    matrices        = pre_assemble(params,setup)
+    cache           = setup_cache(matrices)
+
     for k in Ks
         ω = √(k * g)
-
-        # domain   = CartesianDomain2D(1.0/(k/R), 20*R, (50,50), lateral_tag=SymmetryInlet())
-
-        params = SimulationParams(domain, geometry, method)
-        coeffs = coeff_solve(params, ω, k, ρV, g)
+        coeffs = coeff_solve(cache, matrices, ω, k, 1.0)
 
         # display(coeffs.added_mass)
         # display(coeffs.added_damping)

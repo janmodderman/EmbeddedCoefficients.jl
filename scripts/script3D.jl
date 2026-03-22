@@ -20,7 +20,7 @@ Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 println("ωs: ",ωs)
 println("Ks: ", Ks)
 # ωs = sqrt.(Ks.*g)
-n = 20
+n = 10
 
 depth = 320.0       # [m]: depth
 
