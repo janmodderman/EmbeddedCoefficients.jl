@@ -1,10 +1,15 @@
 module EmbeddedCoefficients
 using Gridap
 using Gridap.Geometry
+using Gridap.Geometry: CompositeTriangulation
+using Gridap.CellData: get_cell_quadrature
+
 using Gridap.FESpaces
 using Gridap.Algebra
 using GridapEmbedded
 using GridapEmbedded.Interfaces
+using GridapEmbedded.Interfaces: SubFacetTriangulation
+
 using STLCutters
 using STLCutters: STLEmbeddedDiscretization
 using SparseArrays
@@ -50,7 +55,6 @@ export CartesianDomain, GmshDomain
 export CartesianDomain2D, CartesianDomain3D
 export LateralBC, WallWall, SymmetryInlet
 export setup_model
-# export DiscreteCut
 
 # ---------------------------------------------------------------
 # Public API — Solver.jl

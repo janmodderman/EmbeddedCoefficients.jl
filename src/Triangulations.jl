@@ -1,27 +1,28 @@
+# TODO: use alternative for type NamedTuple? Difficulty speficying for multiple dispatch names.
 struct Triangulations
-    Ω
-    Ω_act
-    Γ
-    Γf
-    E
-    lateral       
+    Ω::Triangulation
+    Ω_act::Triangulation
+    Γ::Union{SubFacetTriangulation, BoundaryTriangulation}
+    Γf::Union{AppendedTriangulation, CompositeTriangulation}
+    E::Union{SkeletonTriangulation, Nothing}
+    lateral::NamedTuple
 end
 
 struct Measures
-    dΩ
-    dΓ
-    dΓf
-    dE
-    lateral       
+    dΩ::Measure
+    dΓ::Measure
+    dΓf::Measure
+    dE::Union{Measure, Nothing}
+    lateral::NamedTuple
 end
 
 struct Normals
-    nΓ       
-    nE       
-    lateral  
+    nΓ::CellField
+    nE::Union{SkeletonPair{<:CellField}, Nothing}
+    lateral::NamedTuple
 end
 
-function _setup_physical_tris(cutgeo, cutgeo_facets, degree)
+function _setup_physical_tris(cutgeo::EmbeddedDiscretization, cutgeo_facets::EmbeddedFacetDiscretization, degree::Int64)
     Ω     = Interior(cutgeo, PHYSICAL_OUT)
     Ω_act = Interior(cutgeo, ACTIVE_OUT)
     Γ     = EmbeddedBoundary(cutgeo)
@@ -33,14 +34,14 @@ function _setup_physical_tris(cutgeo, cutgeo_facets, degree)
     return Ω, Ω_act, Γ, nΓ, Γf, dΩ, dΓ, dΓf
 end
 
-function _lateral_boundaries(model, degree, ::WallWall)
+function _lateral_boundaries(model::DiscreteModel, degree::Int64, ::WallWall)
     Γw  = BoundaryTriangulation(model, tags=["walls"])
     nΓw = get_normal_vector(Γw)
     dΓw = Measure(Γw, degree)
     return (wall=Γw,), (wall=nΓw,), (wall=dΓw,)
 end
 
-function _lateral_boundaries(model, degree, ::SymmetryInlet)
+function _lateral_boundaries(model::DiscreteModel, degree::Int64, ::SymmetryInlet)
     Γs  = BoundaryTriangulation(model, tags=["symmetry"])
     Γw  = BoundaryTriangulation(model, tags=["walls"])
     nΓs = get_normal_vector(Γs)
@@ -50,13 +51,17 @@ function _lateral_boundaries(model, degree, ::SymmetryInlet)
     return (symmetry=Γs, wall=Γw), (symmetry=nΓs, wall=nΓw), (symmetry=dΓs, wall=dΓw)
 end
 
-function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::AGFEM, lateral_tags::LateralTags)
+function setup_triangulations(model::DiscreteModel, cutgeo::EmbeddedDiscretization, 
+                                cutgeo_facets::EmbeddedFacetDiscretization, degree::Int64, 
+                                ::AGFEM, lateral_tags::LateralTags)
     Ω, Ω_act, Γ, nΓ, Γf, dΩ, dΓ, dΓf = _setup_physical_tris(cutgeo, cutgeo_facets, degree)
     lat_tris, lat_norms, lat_meas       = _lateral_boundaries(model, degree, lateral_tags)
     return Triangulations(Ω, Ω_act, Γ, Γf, nothing, lat_tris), Measures(dΩ, dΓ, dΓf, nothing, lat_meas), Normals(nΓ, nothing, lat_norms)
 end
 
-function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::CUTFEM, lateral_tags::LateralTags)
+function setup_triangulations(model::DiscreteModel, cutgeo::EmbeddedDiscretization, 
+                                cutgeo_facets::EmbeddedFacetDiscretization, degree::Int64, 
+                                ::CUTFEM, lateral_tags::LateralTags)
     Ω, Ω_act, Γ, nΓ, Γf, dΩ, dΓ, dΓf = _setup_physical_tris(cutgeo, cutgeo_facets, degree)
     E  = GhostSkeleton(cutgeo, ACTIVE_OUT)
     nE = get_normal_vector(E)
@@ -65,7 +70,9 @@ function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::CUTFEM, la
     return Triangulations(Ω, Ω_act, Γ, Γf, E, lat_tris), Measures(dΩ, dΓ, dΓf, dE, lat_meas), Normals(nΓ, nE, lat_norms)
 end
 
-function setup_triangulations(model, cutgeo, cutgeo_facets, degree, ::SBM, lateral_tags::LateralTags)
+function setup_triangulations(model::DiscreteModel, cutgeo::EmbeddedDiscretization, 
+                                cutgeo_facets::EmbeddedFacetDiscretization, degree::Int64, 
+                                ::SBM, lateral_tags::LateralTags)
     Ω     = Interior(cutgeo, OUT)
     Γ     = Interface(Interior(cutgeo, ACTIVE_IN), Ω).⁻
     nΓ    = get_normal_vector(Γ)

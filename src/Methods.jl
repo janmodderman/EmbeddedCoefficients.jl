@@ -15,6 +15,8 @@ struct SBM <: EmbeddingMethod
     order::Int64
 end
 
+degree(m::EmbeddingMethod) = 2 * m.order
+
 # Convenience constructors
 AGFEM(; order=1, threshold=1.0)     = AGFEM(order, threshold)
 CUTFEM(; order=1, γg=0.1, h=1.0)    = CUTFEM(order, γg, h)

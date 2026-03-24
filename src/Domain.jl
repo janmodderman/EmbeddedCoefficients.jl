@@ -1,7 +1,6 @@
 abstract type BackgroundMesh{N} end
 abstract type LateralTags end
 
-# Cartesian background mesh (analytically defined)
 struct CartesianDomain{N} <: BackgroundMesh{N}
     L₁::Float64
     L₂::Float64   # 3D only
@@ -10,14 +9,12 @@ struct CartesianDomain{N} <: BackgroundMesh{N}
     lateral_tag::LateralTags
 end
 
-struct SymmetryInlet <: LateralTags end   # inlet = symmetry, outlet = wall
-struct WallWall     <: LateralTags end    # both inlet and outlet = wall
+struct SymmetryInlet    <: LateralTags end    # inlet = symmetry, outlet = wall
+struct WallWall         <: LateralTags end    # both inlet and outlet = wall
 
-# Convenience constructors
-CartesianDomain2D(L₁, depth, partition; lateral_tag=WallWall()) = CartesianDomain{2}(L₁, 0.0, depth, partition, lateral_tag)
+CartesianDomain2D(L₁, depth, partition; lateral_tag=WallWall())     = CartesianDomain{2}(L₁, 0.0, depth, partition, lateral_tag)
 CartesianDomain3D(L₁, L₂, depth, partition; lateral_tag=WallWall()) = CartesianDomain{3}(L₁, L₂, depth, partition, lateral_tag)
 
-# External Gmsh mesh
 struct GmshDomain{N} <: BackgroundMesh{N}
     meshfile::String
 end
@@ -25,25 +22,25 @@ end
 function _build_cartesian_2d(d::CartesianDomain{2}, ::WallWall)
     pmin = Point(-d.L₁, -d.depth)
     pmax = Point(d.L₁,  0.0)
-    CartesianDiscreteModel(pmin, pmax, d.partition)
+    return CartesianDiscreteModel(pmin, pmax, d.partition)
 end
 
 function _build_cartesian_2d(d::CartesianDomain{2}, ::SymmetryInlet)
     pmin = Point(0.0,  -d.depth)
     pmax = Point(d.L₁,  0.0)
-    CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]))
+    return CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]))
 end
 
 function _build_cartesian_3d(d::CartesianDomain{3}, ::WallWall)
     pmin  = Point(-d.L₁/2, -d.L₂/2, -d.depth)
     pmax  = Point(d.L₁/2,  d.L₂/2,  0.0)
-    CartesianDiscreteModel(pmin, pmax, d.partition)
+    return CartesianDiscreteModel(pmin, pmax, d.partition)
 end
 
 function _build_cartesian_3d(d::CartesianDomain{3}, ::SymmetryInlet)
     pmin  = Point(0.0, 0.0, -d.depth)
     pmax  = Point(d.L₁,  d.L₂,  0.0)
-    CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]÷2, d.partition[3]))
+    return CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]÷2, d.partition[3]))
 end
 
 # Build the Gridap model + apply boundary tags
@@ -60,18 +57,18 @@ function setup_model(d::CartesianDomain{3})
 end
 
 function setup_model(d::GmshDomain)
-    GmshDiscreteModel(d.meshfile)   # tags come from the Gmsh file itself
+    return GmshDiscreteModel(d.meshfile)   # tags come from the Gmsh file itself
 end
 
 # Private tagging helpers
-function _tag_2d!(model, ::WallWall)
+function _tag_2d!(model::DiscreteModel, ::WallWall)
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "seabed",  [1,2,5])
     add_tag_from_tags!(labels, "walls",    [3,4,7,8])  # both lateral sides → wall
     add_tag_from_tags!(labels, "surface", [6])
 end
 
-function _tag_2d!(model, ::SymmetryInlet)
+function _tag_2d!(model::DiscreteModel, ::SymmetryInlet)
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "seabed",    [1,2,5])
     add_tag_from_tags!(labels, "symmetry",  [3,7])    # inlet side → symmetry
@@ -79,7 +76,7 @@ function _tag_2d!(model, ::SymmetryInlet)
     add_tag_from_tags!(labels, "surface",   [6])
 end
 
-function _tag_3d!(model)
+function _tag_3d!(model::DiscreteModel)
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "seabed",  [21])
     add_tag_from_tags!(labels, "surface", [22])

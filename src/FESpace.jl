@@ -19,17 +19,17 @@ function _setup_constant_space(model::DiscreteModel)
     return V, U
 end
 
-function _aggregate(strategy, cut_disc::DiscreteCut, ::AnalyticalGeometry)
-    aggregate(strategy, cut_disc.cut, cut_disc.geo, OUT)
+function _aggregate(strategy::AggregateCutCellsByThreshold, cut_disc::DiscreteCut, ::AnalyticalGeometry)
+    return aggregate(strategy, cut_disc.cut, cut_disc.geo, OUT)
 end
 
-function _aggregate(strategy, cut_disc::DiscreteCut, ::STLGeometry)
-    aggregate(strategy, cut_disc.stl, cut_disc.geo, OUT)
+function _aggregate(strategy::AggregateCutCellsByThreshold, cut_disc::DiscreteCut, ::STLGeometry)
+    return aggregate(strategy, cut_disc.stl, cut_disc.geo, OUT)
 end
 
 # public entry point — no conditionals at call site
-function _aggregate(strategy, cut_disc::DiscreteCut)
-    _aggregate(strategy, cut_disc, cut_disc.geo)
+function _aggregate(strategy::AggregateCutCellsByThreshold, cut_disc::DiscreteCut)
+    return _aggregate(strategy, cut_disc, cut_disc.geo)
 end
 
 # Returns Aggregated test and trial FE Space for the velocity potential, and test and trial space for displacement
