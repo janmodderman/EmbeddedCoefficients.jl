@@ -77,7 +77,6 @@ function _cross(r::CellState, nΓ::CellField,
 end
 
 # =======================================
-
 Ft(∇d::TensorValue{2,2}) = TensorValue(1.0,0.0,0.0,1.0) + ∇d
 Ft(∇d::TensorValue{3,3}) = TensorValue(1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0) + ∇d
 
@@ -111,6 +110,10 @@ function _J_cs(geometry::EmbeddedGeometry, dist::CellState, dΓ::Measure)
     zero(Float64),
     dΓ, ∇d
   )
+end
+
+function _J_cs(geometry::Rectangle, dist::CellState, dΓ::Measure)
+  CellState(1.0,dΓ)
 end
 
 # TODO: for SBM the _arm should be to the true boundary, not the surrogate boundary
@@ -291,20 +294,4 @@ function make_a_vϕ(::SBM,
     r_cross_n   = _cross(r, n, geometry, meas.dΓ)
     WeakForm((ϕ, v) -> ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_t⋅v)⋅n)         * (nΓ⋅n) * J_cs )meas.dΓ +
               ∫( im * (-1.0) * (ϕ + (∇(ϕ)⋅d)) * ((id_r⋅v)⋅r_cross_n) * (nΓ⋅n) * J_cs )meas.dΓ, nothing)
-end
-
-# ---------------------------------------------------------------
-# Public interface — make_a_ghost
-# ---------------------------------------------------------------
-
-function make_a_ghost(method::CUTFEM, meas::Measures, norms::Normals, h::Float64)
-  _a_ghost(meas.dE, norms.nE, h, method.γg, Val(method.order))
-end
-
-function make_a_ghost(::AGFEM, args...)
-  (ϕ, w) -> 0.0
-end
-
-function make_a_ghost(::SBM, args...)
-  (ϕ, w) -> 0.0
 end

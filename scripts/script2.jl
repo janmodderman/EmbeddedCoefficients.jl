@@ -5,24 +5,24 @@ using Plots
 # Physical parameters
 KRs = [0.1:0.1:2.0;]
 R = 0.1                         # [m]: radius
-ρV = π*R^2/4                    # [m]: area of a full horizontal cylinder (half domain)
+ρV = R^2                    # [m]: area of a full horizontal cylinder (half domain)
 Ks = KRs./R                     # [m⁻¹]: range of wave numbers
 g = 9.81
-n = 200
+n = 300
 
 p1=plot(xlabel="k̄ [-]",ylabel="Cₐ [-]")
 p2=plot()
 
 # Shared domain + geometry
-geometry = Circle(VectorValue(0.0, 0.0), R)
+geometry = Rectangle(VectorValue(0.0, 0.0), 2*R, R)
 println("domain length: ",1.0/Ks[1])
 println("domain depth: ",20*R)
-domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (5*n,n), lateral_tag=SymmetryInlet())
+domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (2*n,n), lateral_tag=SymmetryInlet())
 # domain   = CartesianDomain2D(1.0/Ks[1], 20*R, (5*n,n), lateral_tag=WallWall())
 
 
 # Run for each method and save
-for method in [AGFEM(order=1), CUTFEM(order=1), SBM(order=1)]
+for method in [AGFEM(order=1), CUTFEM(order=1), SBM(order=1), SBM(order=2)]
     added_mass      = Vector{Float64}()
     added_damping   = Vector{Float64}()
     params          = SimulationParams(domain, geometry, method)

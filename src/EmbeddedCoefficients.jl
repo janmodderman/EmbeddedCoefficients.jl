@@ -73,7 +73,7 @@ export hydro_coeffs
 export setup_spaces, FESpaces
 export setup_triangulations, Triangulations, Measures, Normals
 export assemble_matrices, solve_system, SystemMatrices
-export make_a_wϕ, make_a_wu, make_a_vϕ, make_a_ghost
+export make_a_wϕ, make_a_wu, make_a_vϕ
 export cut_model
 
 end # module

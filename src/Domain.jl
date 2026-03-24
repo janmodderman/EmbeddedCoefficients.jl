@@ -34,6 +34,18 @@ function _build_cartesian_2d(d::CartesianDomain{2}, ::SymmetryInlet)
     CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]))
 end
 
+function _build_cartesian_3d(d::CartesianDomain{3}, ::WallWall)
+    pmin  = Point(-d.L₁/2, -d.L₂/2, -d.depth)
+    pmax  = Point(d.L₁/2,  d.L₂/2,  0.0)
+    CartesianDiscreteModel(pmin, pmax, d.partition)
+end
+
+function _build_cartesian_3d(d::CartesianDomain{3}, ::SymmetryInlet)
+    pmin  = Point(0.0, 0.0, -d.depth)
+    pmax  = Point(d.L₁,  d.L₂,  0.0)
+    CartesianDiscreteModel(pmin, pmax, (d.partition[1]÷2, d.partition[2]÷2, d.partition[3]))
+end
+
 # Build the Gridap model + apply boundary tags
 function setup_model(d::CartesianDomain{2})
     model = _build_cartesian_2d(d, d.lateral_tag)
@@ -42,9 +54,7 @@ function setup_model(d::CartesianDomain{2})
 end
 
 function setup_model(d::CartesianDomain{3})
-    pmin  = Point(-d.L₁/2, -d.L₂/2, -d.depth)
-    pmax  = Point(d.L₁/2,  d.L₂/2,  0.0)
-    model = CartesianDiscreteModel(pmin, pmax, d.partition)
+    model = _build_cartesian_3d(d, d.lateral_tag)
     _tag_3d!(model)
     return model
 end

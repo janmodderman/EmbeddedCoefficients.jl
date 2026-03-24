@@ -4,14 +4,6 @@ struct SystemMatrices
     A_vϕ
 end
 
-# function assemble_matrices(a_wϕ::Function, a_wu::Function, a_vϕ::Function,
-#                             spaces::FESpaces)
-#     A_wϕ = assemble_matrix(a_wϕ, spaces.Φ, spaces.W)
-#     A_wu = assemble_matrix(a_wu, spaces.U, spaces.W)
-#     A_vϕ = assemble_matrix(a_vϕ, spaces.Φ, spaces.V)
-#     SystemMatrices(A_wϕ, A_wu, A_vϕ)
-# end
-
 struct AssembledMatrices
     dep::SystemMatrices
     indep::SystemMatrices
@@ -22,7 +14,6 @@ function _assemble_matrix(fun::Function, U, V)
 end
 
 function _assemble_matrix(fun::Nothing, U, V)
-    # spzeros(ComplexF64, num_free_dofs(V), num_free_dofs(U))
     nothing
 end
 

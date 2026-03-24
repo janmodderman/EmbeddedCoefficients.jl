@@ -110,6 +110,40 @@ function distances(bgmodel::DiscreteModel,
     end
 
     return d_vec_cs, n_vec_cs
+end # Function
+
+function _d(x,geo::Rectangle{2})
+    dx = maximum([-geo.width/2 - x[1], 0.0, x[1] - geo.width/2])
+    dy = maximum([-geo.depth - x[2], 0.0, x[2] - geo.depth])
+    VectorValue(-dx,dy)
+end # function
+
+function _n(x,geo::Rectangle{2})
+    dx = maximum([-geo.width/2 - x[1], 0.0, x[1] - geo.width/2])
+    dy = maximum([-geo.depth - x[2], 0.0, x[2] - geo.depth])
+    dist = √(dx^2+dy^2)
+    VectorValue(-dx/dist,dy/dist)
+end # function
+
+function distances(bgmodel::DiscreteModel,
+                    Γ::Triangulation,
+                    geo::Rectangle{2}, degree::Int)
+
+    Dspace   = num_point_dims(Γ)
+    pmid     = geo.center
+    QΓ       = CellQuadrature(Γ, degree)
+    qcp      = get_cell_points(QΓ)
+    z        = zero(VectorValue{Dspace, Float64})
+    d_vec_cs = CellState(z, QΓ)
+    n_vec_cs = CellState(z, QΓ)
+
+    for (icell, cell) in enumerate(qcp.cell_phys_point)
+        for (ipoint, point) in enumerate(cell)
+            d_vec_cs.values[icell][ipoint] = _d(point,geo)
+            n_vec_cs.values[icell][ipoint] = _n(point,geo)
+        end
+    end
+    return d_vec_cs, n_vec_cs
 end # function
 
 # ===================================================
