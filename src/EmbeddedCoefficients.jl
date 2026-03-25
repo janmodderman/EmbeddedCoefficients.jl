@@ -79,5 +79,6 @@ export setup_triangulations, Triangulations, Measures, Normals
 export assemble_matrices, solve_system, SystemMatrices
 export make_a_wϕ, make_a_wu, make_a_vϕ
 export cut_model
+export WeakForm
 
 end # module

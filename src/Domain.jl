@@ -52,7 +52,7 @@ end
 
 function setup_model(d::CartesianDomain{3})
     model = _build_cartesian_3d(d, d.lateral_tag)
-    _tag_3d!(model)
+    _tag_3d!(model, d.lateral_tag)
     return model
 end
 
@@ -76,14 +76,22 @@ function _tag_2d!(model::DiscreteModel, ::SymmetryInlet)
     add_tag_from_tags!(labels, "surface",   [6])
 end
 
-function _tag_3d!(model::DiscreteModel)
+function _tag_3d!(model::DiscreteModel, ::WallWall)
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "seabed",  [21])
     add_tag_from_tags!(labels, "surface", [22])
     add_tag_from_tags!(labels, "walls", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
 end
 
-# container for results from cutting the background model
+function _tag_3d!(model::DiscreteModel, ::SymmetryInlet)
+    labels = get_face_labeling(model)
+    add_tag_from_tags!(labels, "seabed",  [21])
+    add_tag_from_tags!(labels, "surface", [22])
+    add_tag_from_tags!(labels, "walls", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,23,24,25,26])
+    add_tag_from_tags!(labels, "symmetry", [9,11,17,18,23])
+end
+
+# container for results from cutting the background model, required for AgFEMSpace
 struct DiscreteCut 
     geo::Union{AnalyticalGeometry,STLGeometry}
     cut::EmbeddedDiscretization

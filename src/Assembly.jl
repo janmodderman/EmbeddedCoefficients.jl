@@ -10,7 +10,7 @@ struct AssembledMatrices
 end
 
 function _assemble_matrix(fun::Function, U::FESpace , V::FESpace )
-    return assemble_matrix(fun,U,V)
+    return assemble_matrix(fun, U, V)
 end
 
 function _assemble_matrix(fun::Nothing, U::FESpace , V::FESpace )
