@@ -13,6 +13,7 @@ using GridapEmbedded.Interfaces: SubFacetTriangulation
 using STLCutters
 using STLCutters: STLEmbeddedDiscretization
 using SparseArrays
+using GridapGmsh
 using LinearAlgebra
 
 # ---------------------------------------------------------------
@@ -36,6 +37,7 @@ include("Solver.jl")         # depends on everything — must be last
 export EmbeddingMethod
 export AGFEM, CUTFEM, SBM, WSBM
 export label
+export smallest_cell_size
 
 # ---------------------------------------------------------------
 # Public API — Geometry.jl
@@ -52,7 +54,7 @@ export gridap_geo                        # for advanced users
 
 export BackgroundMesh
 export CartesianDomain, GmshDomain
-export CartesianDomain2D, CartesianDomain3D
+export CartesianDomain2D, CartesianDomain3D, GmshDomain2D, GmshDomain3D
 export LateralBC, WallWall, SymmetryInlet
 export setup_model
 

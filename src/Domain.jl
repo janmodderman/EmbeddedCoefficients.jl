@@ -17,7 +17,11 @@ CartesianDomain3D(L₁, L₂, depth, partition; lateral_tag=WallWall()) = Cartes
 
 struct GmshDomain{N} <: BackgroundMesh{N}
     meshfile::String
+    lateral_tag::LateralTags
 end
+
+GmshDomain2D(meshfile; lateral_tag=WallWall()) = GmshDomain{2}(meshfile, lateral_tag)
+GmshDomain3D(meshfile; lateral_tag=WallWall()) = GmshDomain{3}(meshfile, lateral_tag)
 
 function _build_cartesian_2d(d::CartesianDomain{2}, ::WallWall)
     pmin = Point(-d.L₁, -d.depth)
