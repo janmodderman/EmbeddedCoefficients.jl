@@ -92,7 +92,7 @@ function run_hr_study()
             "description" => "Study of added mass and damping coefficients for submerged cylinder at various submergence ratios",
             "global_parameters" => Dict(
                 "R" => 0.1,
-                "ρV" => π * (0.1)^2 / 4,
+                "ρV" => π * (0.1)^2 / 2,
                 "g" => 9.81,
                 "KRs" => collect(0.1:0.1:2.0),
                 "num_wavelengths" => 20
