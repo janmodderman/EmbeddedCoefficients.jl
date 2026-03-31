@@ -4,11 +4,11 @@ using GridapGmsh
 using Plots
 using JSON
 
-function conduct_study_622(HR)
+function conduct_study_621(HR)
     # Physical parameters
     KRs = [0.1:0.1:2.0;]
     R = 0.1                         # [m]: radius
-    ρV = π*R^2/2                    # [m]: area of a full horizontal cylinder (half domain)
+    ρV = 2*R^2                        # [m]: area of a rectangle (half domain)
     Ks = KRs./R                     # [m⁻¹]: range of wave numbers
     g = 9.81
 
@@ -16,15 +16,16 @@ function conduct_study_622(HR)
     p2 = plot(xlabel="k̄ [-]", ylabel="B̄₃₃ [-]")
 
     # Shared domain + geometry
-    pmid = VectorValue(0.0, -HR * R)
-    geometry = Circle(pmid, R)
+    pmid = VectorValue(0.0, 0.0)
+    geometry = Rectangle(VectorValue(0.0, 0.0), 2*R, R)
     domain = GmshDomain2D("data/meshes/background_shapes.msh", lateral_tag=SymmetryInlet())
 
     # Dictionary to store all results for this HR value
     hr_results = Dict(
         "HR" => HR,
         "submergence_depth" => HR * R,
-        "radius" => R,
+        "breadth" => 2*R,
+        "draft" => R,
         "cylinder_center" => Dict(
             "x" => pmid[1],
             "y" => pmid[2]
@@ -84,7 +85,7 @@ end
 
 # Main execution function
 function run_hr_study()
-    HRs = [0.0, 0.342, 0.643, 0.809, 0.906]  # ratios of H/R as defined in the dissertation
+    HRs = [0.0]  # ratios of H/R as defined in the dissertation
 
     # Master dictionary to store all results across all HR values
     all_results = Dict(
@@ -92,7 +93,7 @@ function run_hr_study()
             "description" => "Study of added mass and damping coefficients for submerged cylinder at various submergence ratios",
             "global_parameters" => Dict(
                 "R" => 0.1,
-                "ρV" => π * (0.1)^2 / 4,
+                "ρV" => 0.1^2,
                 "g" => 9.81,
                 "KRs" => collect(0.1:0.1:2.0),
                 "num_wavelengths" => 20
@@ -106,7 +107,7 @@ function run_hr_study()
     # Run study for each HR value
     for HR in HRs
         println("Running study for HR = $HR...")
-        hr_results = conduct_study_622(HR)
+        hr_results = conduct_study_621(HR)
         
         # Store this HR's results in the master dictionary
         all_results["hr_studies"]["HR_$(HR)"] = hr_results
@@ -115,7 +116,7 @@ function run_hr_study()
     end
 
     # Save complete results to JSON file
-    output_file = "data/results_study_622_all_hr.json"
+    output_file = "data/results_study_621_all_hr.json"
     mkpath(dirname(output_file))  # Create directory if it doesn't exist
     open(output_file, "w") do f
         JSON.print(f, all_results, 4)  # Pretty print with 4-space indentation
